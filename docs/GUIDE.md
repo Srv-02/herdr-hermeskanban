@@ -35,7 +35,7 @@ In Herdr, ask your agent:
 Read ~/.config/herdr-app/AGENTS.md, then add this mod: https://github.com/Srv-02/herdr-hermeskanban/tree/main
 ```
 
-Then click `Hermes` in the tab bar.
+Then focus a pane on a machine that runs Hermes and click `Hermes` in the tab bar.
 
 ### Manual install
 
@@ -63,15 +63,17 @@ Then click `Hermes` in the tab bar.
 
    The button finds the panel by its mod, whatever its `id`. In a `panel-body` of type `stack` it shows the panel alone; in a `column` it switches the panel on and off beside the others.
 
-3. If an instance signs people in, open the panel on a Hermes pane of that machine and follow [Set up access](#set-up-access).
+3. If an instance signs people in, open the panel on a pane of that machine and follow [Set up access](#set-up-access).
 
 ## The panel
 
 ### Following the pane
 
-- The panel shows the board of the Hermes in the focused pane: a pane where Herdr sees the agent `hermes` running. The machine comes from the pane's space (or, for a terminal block, from its address `devbox/t3`).
-- **No Hermes here:** a shell, a pane on your Mac or any other program shows `No Hermes in this pane`. The panel never falls back to the last board, and it never shows two boards mixed.
+- The panel shows the board of the Hermes on the focused pane's machine. The machine comes from the pane's space (or, for a terminal block, from its address `devbox/t3`).
+- **Per machine:** a machine runs Hermes when the button's last poll found `~/.hermes/kanban.db` there (see [Syncing](#syncing)). Then every pane on it shows its board: a shell, a Hermes pane or a terminal block alike. So a machine that runs Hermes only as a gateway service, with nothing but a shell open in Herdr, shows its board too. Before the first poll knows a machine, a pane where Herdr sees the agent `hermes` running counts as well.
+- **No Hermes here:** a pane on a machine without `kanban.db`, and every pane on your Mac, shows `No Hermes on this machine`. The panel never falls back to the last board, and it never shows two boards mixed.
 - **Clicking into the panel** (the search, say) keeps the board: a mod has the keyboard then, not a pane.
+- **The `Hermes` button** opens and closes the panel on any pane of a machine that runs Hermes, and also while you work in the panel. On any other pane it is grey with the tooltip `No Hermes on this machine`, and a click does nothing, except that it still closes a panel that is open. While another instance needs you, a click jumps there instead (see [Notifications](#notifications)).
 - The panel follows a change of focus within 3 seconds at the latest.
 - **The header:** `Hermes`, the instance's name on the right, then `+` (new task), refresh, the funnel (priority and grouping) and the gear (settings). Without a Hermes only the gear stays.
 
@@ -155,9 +157,10 @@ The `+` in the header opens `New task` on the instance the panel shows; the dial
   - **needs you:** a task became Blocked or Review, or keeps cycling between blocked and unblocked: `devbox: writer needs input`.
   - **failed:** Hermes counts a new failed run of the task (crashed, timed out, gave up, could not start): `devbox: writer failed`, with the reason.
   - **done:** `devbox: writer finished`.
-  - A click on a toast jumps to that instance's Hermes pane (the one focused last, else the first one, else any pane of a space on that machine); the panel follows by itself.
-- **The dot** on the `Hermes` button, over all visible instances: red and glowing for something new that needs you (needs you or failed), green for a task newly done, nothing else. It shows only what you have not seen: opening the panel on an instance clears its part, and the instance the panel shows collects nothing. A task that just stays blocked, or an agent that runs, adds nothing. No count.
+  - A click on a toast jumps to that instance: the pane you focused there last (a shell pane as well, if it is still open), else the first pane that runs Hermes, else the first terminal pane, else any pane of a space on that machine; the panel follows by itself.
+- **The dot** on the `Hermes` button, over all visible instances: red and glowing for something new that needs you (needs you or failed), green for a task newly done, nothing else. It shows only what you have not seen: opening the panel on an instance clears its part at once, and so does a click on the button that jumps there; and the instance the panel shows collects nothing. A task that just stays blocked, or an agent that runs, adds nothing. No count.
 - **Other instances:** in the panel, a red strip `labbox needs you` with `Go to pane →` for each other visible instance with unseen news that needs you.
+- **The button jumps:** while another visible instance has unseen news that needs you (a red strip would show for it), the tooltip says `Go to labbox` and a click on `Hermes` goes to that instance, as a toast does, and opens the panel there. With several, the first by name. This holds on any pane, on a machine with or without Hermes. A green dot changes nothing about the click.
 - **Sounds:** Herdr's `blocked` sound for needs you and failed, its `done` sound for done; at most one per poll. **Dock badge:** a dot on the Herdr icon while something that needs you is unseen; no number.
 - Each has its own switch in the [settings](#settings).
 
@@ -286,7 +289,7 @@ The dialog also shows, without a key of its own: **Default agent** of the shown 
 
 ## Removing
 
-Remove access first, on each instance where you set it up, while the mod is still installed: open the panel on a Hermes pane of that machine, then **Settings** > **Remove access**, and follow its steps in their order: the drop-in, then **Restart gateway**, then **Delete key**.
+Remove access first, on each instance where you set it up, while the mod is still installed: open the panel on a pane of that machine, then **Settings** > **Remove access**, and follow its steps in their order: the drop-in, then **Restart gateway**, then **Delete key**.
 
 Then delete `~/.config/herdr-app/mods/hermes-kanban`, the two blocks from your layout, and, if you like, `~/.config/herdr-app/hermes-kanban.json`.
 
