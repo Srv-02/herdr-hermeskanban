@@ -17,3 +17,7 @@ test("foreign lease: kept up to 3 minutes, taken over after", () => {
   assert.deepEqual(leaseNext({ owner: "o", at: 1000 }, "me", 181000), { owner: "o", at: 1000, mine: false, write: false });
   assert.deepEqual(leaseNext({ owner: "o", at: 1000 }, "me", 181001), { owner: "me", at: 181001, mine: true, write: true });
 });
+test("a lease stamped in the future (the clock moved back) counts as expired", () => {
+  assert.deepEqual(leaseNext({ owner: "o", at: 500000 }, "me", 1000), { owner: "me", at: 1000, mine: true, write: true });
+  assert.deepEqual(leaseNext({ owner: "me", at: 500000 }, "me", 1000), { owner: "me", at: 1000, mine: true, write: true }, "own: renewed at once");
+});
