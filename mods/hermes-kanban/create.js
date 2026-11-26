@@ -104,7 +104,7 @@ export class CreateDialog {
         .child(button("close", "Close", t, () => closeOverlay(this.overlay), { primary: true }))
       : foot.child(div().flex_1().min_w(0).text_size(12).text_color(c.red).child(this.error ?? ""))
         .child(button("cancel", "Cancel", t, () => closeOverlay(this.overlay)))
-        .child(button("create", busy ? "Creating…" : "Create", t, (_e, cx) => this.create(cx), { primary: true, enabled: this.typed && !busy }));
+        .child(button("create", busy ? "Creating…" : "Create", t, (_e, cx) => this.create(cx), { primary: true, enabled: Boolean(this.typed) && !busy }));
 
     return v_flex().id("create").size_full().min_h(0).rounded(12).overflow_hidden().border_1().border_color(t.border)
       .bg(t.background).text_color(t.foreground).text_size(13)

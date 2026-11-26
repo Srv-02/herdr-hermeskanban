@@ -208,6 +208,15 @@ test("the overlay: Comment & unblock only while blocked, Ctrl+Enter comments", (
   assert.match(src, /"Ctrl\+Enter to comment"/);
 });
 
+// buttonFace defaults `enabled` to true, so an undefined value (a flag not set yet) draws an enabled button: every
+// `enabled:` passed must be a boolean already.
+test("buttons get enabled as a boolean, never a flag that may be undefined", () => {
+  const files = fs.readdirSync(dir, { recursive: true }).filter((f) => f.endsWith(".js") && f !== "ui.js");
+  const loose = files.flatMap((f) => [...source(f).matchAll(/\benabled: ([^,}]+)/g)]
+    .map((m) => m[1].trim()).filter((v) => !/^(!|Boolean\(|true\b|false\b)/.test(v)).map((v) => `${f}: ${v}`));
+  assert.deepEqual(loose, []);
+});
+
 test("single agent mode hides the agent choice in both overlays", () => {
   for (const f of ["viewer.js", "create.js"]) assert.match(code(f), /isSingleAgent\(this\.settings, this\.machine\)/, f);
 });

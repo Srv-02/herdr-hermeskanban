@@ -235,9 +235,9 @@ export class TaskViewer {
       .child(div().id("box").px(12).py(10).cursor_text().child(Textarea.new(this.box).w_full().text_size(13).text_color(t.foreground)))
       .child(h_flex().px(10).py(8).gap(8).items_center().border_t(1).border_color(t.border)
         .child(div().flex_1().text_size(11).text_color(t.muted).child("Ctrl+Enter to comment"))
-        .child(button("comment", "Comment", t, (_e, cx) => this.comment(cx), { enabled: this.typed && !busy }))
+        .child(button("comment", "Comment", t, (_e, cx) => this.comment(cx), { enabled: Boolean(this.typed) && !busy }))
         .when(blocked, (e) => e.child(button("comment-unblock", "Comment & unblock", t, (_e, cx) => this.commentAndUnblock(cx),
-          { tone: c.blue, enabled: this.typed && !busy, tooltip: "Adds the comment, then asks Hermes to move the task to ready" }))));
+          { tone: c.blue, enabled: Boolean(this.typed) && !busy, tooltip: "Adds the comment, then asks Hermes to move the task to ready" }))));
   }
 
   // ---- the right column ----
