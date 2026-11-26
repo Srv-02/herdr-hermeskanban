@@ -36,6 +36,7 @@ export function normalizeTask(t, machine) {
   };
 }
 
+// Expects checkBoard(json) to have passed.
 export function normalizeBoard(json, machine) {
   return {
     machine,

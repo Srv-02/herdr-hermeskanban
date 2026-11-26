@@ -49,12 +49,17 @@ export function createApi(exec, mode) {
     diagnostics: (machine) => kanban(machine, "GET", "/diagnostics?severity=warning").then((r) => ({ ...r, problems: problemCount(r.json) })),
     task: (machine, id) => kanban(machine, "GET", `/tasks/${idPath(id)}`),
     // status "archived" archives (plugin_api.py _patch_status); the answer carries the task as Hermes left it.
+    // Hermes reads assignee null as "not sent" and unassigns only with "", so null goes out as "".
     patch(machine, id, fields) {
-      return kanban(machine, "PATCH", `/tasks/${idPath(id)}`, pick(fields, ["status", "assignee", "priority"])).then(withTask(machine));
+      const path = `/tasks/${idPath(id)}`;
+      const body = pick(fields, ["status", "assignee", "priority"]);
+      if (body.assignee === null) body.assignee = "";
+      if (!Object.keys(body).length) throw new Error("a patch needs status, assignee or priority");
+      return kanban(machine, "PATCH", path, body).then(withTask(machine));
     },
     comment(machine, id, body) {
       const path = `/tasks/${idPath(id)}/comments`;
-      if (typeof body !== "string") throw new Error("a comment needs a text body");
+      if (typeof body !== "string" || !body.trim()) throw new Error("a comment needs a text body");
       return kanban(machine, "POST", path, { body, author: "herdr" });
     },
     create(machine, fields) {

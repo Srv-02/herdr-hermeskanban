@@ -80,7 +80,7 @@ test("a call without machine is refused, never run on this computer", () => {
   for (const m of [null, undefined, ""]) {
     assert.throws(() => api.board(m), /machine/);
     assert.throws(() => api.status(m), /machine/);
-    assert.throws(() => api.patch(m, "t_a1b2", {}), /machine/);
+    assert.throws(() => api.patch(m, "t_a1b2", { status: "ready" }), /machine/);
   }
   assert.equal(calls.length, 0);
 });
@@ -121,7 +121,7 @@ test("actions on tasks of two machines never cross over", async () => {
 
 test("act refuses a task without machine", () => {
   const { api, calls } = fake();
-  assert.throws(() => api.act({ id: "t_a1b2" }, "patch", {}), /machine/);
+  assert.throws(() => api.act({ id: "t_a1b2" }, "patch", { status: "ready" }), /machine/);
   assert.throws(() => api.act({ id: "t_a1b2", machine: "" }, "comment", { body: "x" }), /machine/);
   assert.throws(() => api.act(null, "patch", {}), /machine/);
   assert.equal(calls.length, 0);
@@ -141,7 +141,7 @@ test("rejects unsafe task ids", () => {
     assert.throws(() => api.task("devbox", id), /id/);
     assert.throws(() => api.patch("devbox", id, { status: "ready" }), /id/);
     assert.throws(() => api.comment("devbox", id, "x"), /id/);
-    assert.throws(() => api.act({ machine: "devbox", id }, "patch", {}), /id/);
+    assert.throws(() => api.act({ machine: "devbox", id }, "patch", { status: "ready" }), /id/);
   }
   assert.equal(calls.length, 0);
 });
@@ -161,8 +161,32 @@ test("patch sends only status, assignee and priority and returns the normalized 
   assert.equal(r.error, null);
   assert.equal(r.task.status, "todo");
   assert.equal(r.task.machine, "devbox");
+});
+
+test("unassign sends an empty assignee, not null", async () => {
+  const { api, calls } = fake({ reply: { task: fixture("task").task } });
   await api.patch("devbox", "t_a1b2", { assignee: null });
-  assert.deepEqual(body(calls[1]), { assignee: null });
+  await api.act({ machine: "devbox", id: "t_a1b2" }, "patch", { assignee: "" });
+  assert.deepEqual(body(calls[0]), { assignee: "" });
+  assert.deepEqual(body(calls[1]), { assignee: "" });
+});
+
+test("a patch without status, assignee or priority is refused before any request", () => {
+  const { api, calls } = fake();
+  for (const f of [{}, { title: "x" }, undefined, { status: undefined }]) {
+    assert.throws(() => api.patch("devbox", "t_a1b2", f), /patch/);
+  }
+  assert.throws(() => api.act({ machine: "devbox", id: "t_a1b2" }, "patch", {}), /patch/);
+  assert.equal(calls.length, 0);
+});
+
+test("an empty comment is refused before any request", () => {
+  const { api, calls } = fake();
+  for (const t of ["", "   ", "\n\t", null, undefined]) {
+    assert.throws(() => api.comment("devbox", "t_a1b2", t), /comment/);
+  }
+  assert.throws(() => api.act({ machine: "devbox", id: "t_a1b2" }, "comment", { body: " " }), /comment/);
+  assert.equal(calls.length, 0);
 });
 
 test("archive is a PATCH to status archived", async () => {
