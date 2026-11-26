@@ -3,7 +3,7 @@
 // Every step goes through `hc exec --on <machine>`. Nothing here prints the key: probe reports only yes/no, verify
 // only the HTTP code and the top-level keys of the answer. restart refuses without --confirm.
 import { spawnSync } from "node:child_process";
-import { BASE, KANBAN, parseResponse, requestSpec, withBoard } from "../mods/hermes-kanban/lib/request.js";
+import { BASE, KANBAN, parseResponse, redactSecrets, requestSpec, withBoard } from "../mods/hermes-kanban/lib/request.js";
 import { DELETE_TOKEN_SCRIPT, PROBE_SCRIPT, REMOVE_SCRIPT, SETUP_SCRIPT, curlOk, parseProbe, pickUnit, restartSpec, scriptSpec } from "../mods/hermes-kanban/lib/setup.js";
 
 const [command, machine, ...flags] = process.argv.slice(2);
@@ -17,14 +17,15 @@ if (!COMMANDS.includes(command) || !machine) {
 function run({ cmd, args, opts }) {
   const seconds = String(Math.min(600, Math.ceil((opts.timeout ?? 30000) / 1000)));
   const r = spawnSync("hc", ["exec", "--json", "--on", opts.on, "--timeout", seconds, "--", cmd, ...args], { encoding: "utf8", maxBuffer: 16 << 20 });
-  if (r.status !== 0) throw new Error(`hc exec failed (${r.status}): ${r.stderr.trim()}`);
+  if (r.status !== 0) throw new Error(`hc exec failed (${r.status}): ${redactSecrets(r.stderr.trim())}`);
   const j = JSON.parse(r.stdout);
   const text = (b) => Buffer.from(b ?? "", "base64").toString("utf8");
   if (j.timed_out) throw new Error("timed out");
   return { code: j.code, stdout: text(j.stdout), stderr: text(j.stderr) };
 }
 
-const print = (v) => console.log(JSON.stringify(v, null, 2));
+// Everything printed goes through redactSecrets: command output from the machine is never trusted to be key-free.
+const print = (v) => console.log(redactSecrets(JSON.stringify(v, null, 2)));
 const probe = () => parseProbe(run(scriptSpec(machine, PROBE_SCRIPT, [])).stdout);
 
 function unitOf(p) {
@@ -76,6 +77,6 @@ const steps = {
 try {
   process.exit(steps[command]() || 0);
 } catch (e) {
-  console.error(`${command}: ${e.message}`);
+  console.error(redactSecrets(`${command}: ${e.message}`));
   process.exit(1);
 }

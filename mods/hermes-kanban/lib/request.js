@@ -57,3 +57,11 @@ export function parseResponse(result) {
   try { json = JSON.parse(text); } catch { json = null; }
   return { code, json, error: null };
 }
+
+// Output of commands run on the machine (stderr, the restart's log) may be shown to people; anything that looks like
+// a key (token_urlsafe(32) gives 43 characters) is masked first, and a known key value always.
+export function redactSecrets(text, known = []) {
+  let out = String(text ?? "");
+  for (const k of known) if (k) out = out.split(k).join("[redacted]");
+  return out.replace(/(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{32,}(?![A-Za-z0-9_-])/g, "[redacted]");
+}

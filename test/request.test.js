@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { mkTmpSync } from "./tmp-helper.js";
-import { BASE, BOARD, KANBAN, PORT, REQUEST_SCRIPT, TOKEN_FILES, parseResponse, requestSpec, withBoard } from "../mods/hermes-kanban/lib/request.js";
+import { BASE, BOARD, KANBAN, PORT, REQUEST_SCRIPT, TOKEN_FILES, parseResponse, redactSecrets, requestSpec, withBoard } from "../mods/hermes-kanban/lib/request.js";
 
 // A fake machine: HOME with token files, and a curl on PATH that logs its argv (NUL-separated) and its stdin.
 function fakeMachine() {
@@ -118,4 +118,13 @@ test("parseResponse handles non-JSON, empty output and curl failure", () => {
   assert.equal(parseResponse({ code: 7, stdout: "", stderr: "curl: (7) Failed to connect" }).code, 0);
   assert.match(parseResponse({ code: 7, stdout: "", stderr: "curl: (7) Failed to connect" }).error, /connect/);
   assert.equal(parseResponse({ code: 7, stdout: "\n000", stderr: "curl: (7) Failed to connect" }).code, 0);
+});
+
+test("redactSecrets masks key-like strings and known values", () => {
+  const key = "Ab3_-".repeat(8) + "xyz"; // 43 characters, like token_urlsafe(32)
+  assert.equal(redactSecrets(`token=${key} done`), "token=[redacted] done");
+  assert.equal(redactSecrets(`url ?t=${key}&x=1`), "url ?t=[redacted]&x=1");
+  assert.equal(redactSecrets("short tok-FAKE-123 stays", ["tok-FAKE-123"]), "short [redacted] stays");
+  assert.equal(redactSecrets("Restarting hermes-gateway.service ... done (pid 4242)"), "Restarting hermes-gateway.service ... done (pid 4242)");
+  assert.equal(redactSecrets(null), "");
 });
