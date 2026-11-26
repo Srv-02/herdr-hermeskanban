@@ -86,7 +86,7 @@ Then click `Hermes` in the tab bar.
 - The tab bar button does the polling, also while the panel is hidden, so toasts arrive. If Herdr shows the button in several windows, one copy holds shared `hermes-kanban.lease` (renewed every minute, taken over after 3 minutes) and polls; the others draw what it shares.
 - **Every 30 seconds** (the setting [`poll_seconds`](#settings)) each visible instance gets a cheap check: the modification time in nanoseconds and the size of `~/.hermes/kanban.db` and `kanban.db-wal`. The database is never opened. Only when that changed does the button read the board through Hermes' API; as a safety net it reads it every 5 minutes anyway.
 - The gateway's status, Hermes' workflow (columns and allowed moves) and the default agent are read at the start, after an error and every 5 minutes. A machine without `kanban.db` has no Hermes; it is looked at again every 5 minutes.
-- Switching to an instance shows its last board at once, from memory. Boards are not written to disk.
+- Switching to an instance shows its last board at once. The button and the panel share the last boards through Herdr's shared state (`hermes-kanban.boards`), which Herdr keeps in `shared.json` in the Herdr app folder. So the last boards of every visible instance, with titles, block summaries and failure texts, are on your Mac's disk and outlive a restart. Leave that file out of backups or dotfile repos you share.
 - **The refresh button** asks for a poll now and turns until it is done. It turns red with a dot when the last poll failed; its tooltip says why. After every action in an overlay the machine is polled at once.
 - A failed poll keeps the last board and reports nothing. The first board of a machine (after Herdr starts, after the machine comes back, after another button copy took over) only sets the baseline: no toasts for what happened before.
 
@@ -278,7 +278,7 @@ The dialog also shows, without a key of its own: **Default agent** of the shown 
 
 **On your Mac:**
 
-- **Files:** `hermes-kanban.json` in the Herdr app folder, written only by the Settings dialog. The filters and whether the second filter row is open are kept in the mod's own storage. No cache file: boards live in memory only.
+- **Files:** `hermes-kanban.json` in the Herdr app folder, written only by the Settings dialog. The filters and whether the second filter row is open are kept in the mod's own storage. The mod writes no cache file of its own, but Herdr keeps every shared value below in `shared.json` in the Herdr app folder, the last boards (`hermes-kanban.boards`) included.
 - **Network:** the daily update check (see [Updates](#updates)). Nothing else: every Hermes call runs on its machine.
 - **Programs:** `open` for an `https` link you click in a task.
 - **Shared values:** `workspace.panels` (adds `hermes-kanban` so the tab bar restores the panel), `hermes-kanban.boards` (the boards), `hermes-kanban.unseen` and `hermes-kanban.seen` (the dot), `hermes-kanban.shown` (which instance each panel shows), `hermes-kanban.lastPanes` (where a jump lands), `hermes-kanban.refresh` (poll a machine now), `hermes-kanban.restarting` (one gateway restart per machine at a time), `hermes-kanban.pick` (the agent menu), `hermes-kanban.config` (the dialog saved), `hermes-kanban.update` and `hermes-kanban.lease` (the update check and the polling copy).
