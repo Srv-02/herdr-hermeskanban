@@ -1,8 +1,8 @@
 // The poller: one state per visible machine, polled on its own beat (poll_seconds). Each poll first reads the cheap
-// stamp of kanban.db; /board (with /diagnostics for the problems count) follows only when the stamp changed, when a
-// refresh was asked, and every FULL_EVERY as a safety net. /api/status, /workflow and /orchestration come at the
-// start, after an error and every META_EVERY. The probe runs only on trouble (401 or gateway down), never in normal
-// operation. Boards are kept unfiltered, as Hermes returns them; filters belong to the view.
+// stamp of kanban.db; /board (then, after a 200, /diagnostics for the problems count) follows only when the stamp
+// changed, when a refresh was asked, and every FULL_EVERY as a safety net. /api/status, /workflow and /orchestration
+// come at the start, after an error and every META_EVERY. The probe runs only on trouble (401 or gateway down), never
+// in normal operation. Boards are kept unfiltered, as Hermes returns them; filters belong to the view.
 //
 // Changes are reported against the last good board of the same machine. A machine's first board, also after it left
 // the list and came back, only sets the baseline. A failed poll keeps the last snapshot and reports nothing.
@@ -28,6 +28,8 @@ function blank(machine) {
 
 export function createPoller({ api, run, now, settings }) {
   const states = new Map();
+  // Set only by a new /api/status or a gateway found down; never cleared when a machine leaves the list.
+  const modes = new Map();
 
   const pace = () => {
     const s = settings()?.poll_seconds;
@@ -63,16 +65,17 @@ export function createPoller({ api, run, now, settings }) {
       const stamp = parseStamp(stamped?.stdout ?? "");
       if (stamp === null) {
         // No kanban.db: no Hermes here (now). Its old data goes, so a later Hermes starts with a new baseline.
-        Object.assign(st, { stamp: null, mode: null, rawStatus: null, metaDue: true, fullDue: false });
+        Object.assign(st, { stamp: null, rawStatus: null, metaDue: true, fullDue: false });
         return { snap: { ...blank(machine), at: t }, changes: [] };
       }
       snap.hermes = true;
 
-      const meta = st.metaDue || !st.mode || t - st.lastMeta >= META_EVERY;
+      const meta = st.metaDue || !modes.get(machine) || t - st.lastMeta >= META_EVERY;
       if (meta) {
         const s = await api.status(machine);
         if (s.code !== 200 || !isObj(s.json)) {
-          Object.assign(st, { rawStatus: null, mode: null });
+          st.rawStatus = null;
+          modes.set(machine, null);
           snap.status = null;
           snap.mode = null;
           snap.access = accessState({ status: null, probe: await probe(machine), statsCode: 0 });
@@ -80,7 +83,8 @@ export function createPoller({ api, run, now, settings }) {
         }
         st.rawStatus = s.json;
         snap.status = normalizeStatus(s.json);
-        st.mode = snap.mode = snap.status.gated ? "gated" : "open";
+        snap.mode = snap.status.gated ? "gated" : "open";
+        modes.set(machine, snap.mode);
       }
 
       const full = meta || st.fullDue || stamp !== st.stamp || t - st.lastFull >= FULL_EVERY || snap.board === null;
@@ -89,7 +93,7 @@ export function createPoller({ api, run, now, settings }) {
         return done();
       }
       st.fullDue = false;
-      const [b, d] = await Promise.all([api.board(machine), api.diagnostics(machine)]);
+      const b = await api.board(machine);
       if (b.code === 401) {
         snap.access = accessState({ status: st.rawStatus, probe: await probe(machine), statsCode: 401 });
         snap.error = null;
@@ -111,6 +115,7 @@ export function createPoller({ api, run, now, settings }) {
         snap.board = null;
         snap.unsupported = `Hermes ${snap.status?.version ?? "?"} not supported yet`;
       }
+      const d = await api.diagnostics(machine);
       snap.problems = d.code === 200 ? d.problems : null;
 
       if (meta) {
@@ -133,7 +138,7 @@ export function createPoller({ api, run, now, settings }) {
       const t = now();
       const results = await Promise.all(list.map(async (m) => {
         let st = states.get(m);
-        if (!st) states.set(m, st = { snap: null, stamp: null, mode: null, rawStatus: null, lastPoll: 0, lastFull: 0, lastMeta: 0, metaDue: true, fullDue: false, busy: false });
+        if (!st) states.set(m, st = { snap: null, stamp: null, rawStatus: null, lastPoll: 0, lastFull: 0, lastMeta: 0, metaDue: true, fullDue: false, busy: false });
         if (st.busy || !due(st, t)) return [];
         st.busy = true;
         st.lastPoll = t;
@@ -157,7 +162,8 @@ export function createPoller({ api, run, now, settings }) {
       const st = states.get(machine);
       if (st) st.fullDue = true;
     },
-    // The access mode of a machine from its last /api/status, for createApi: "gated", "open" or null.
-    mode: (machine) => states.get(machine)?.mode ?? null,
+    // The access mode of a machine from its last /api/status, for createApi: "gated", "open" or null. It outlives the
+    // machine leaving the list, so an open overlay can still act on its task.
+    mode: (machine) => modes.get(machine) ?? null,
   };
 }

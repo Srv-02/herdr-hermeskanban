@@ -320,3 +320,27 @@ test("a machine that leaves during its poll is dropped", async () => {
   s.advance(30000);
   assert.deepEqual((await s.poller.tick(["devbox"])).changes, [], "its board never became a baseline");
 });
+
+test("the mode outlives the machine leaving the list", async () => {
+  const s = setup({ devbox: { stamp: "1.0", status: gated(), board: board({ id: "t_a1b2", status: "blocked" }) } });
+  await s.poller.tick(["devbox"]);
+  s.advance(30000);
+  await s.poller.tick([]);
+  assert.equal(s.poller.mode("devbox"), "gated", "an open overlay can still act on its task");
+  s.machines.devbox.status = null;
+  s.machines.devbox.stamp = "2.0";
+  s.advance(30000);
+  await s.poller.tick(["devbox"]);
+  assert.equal(s.poller.mode("devbox"), null, "a gateway found down clears it");
+});
+
+test("/diagnostics only follows a board answered with 200", async () => {
+  const s = setup({ devbox: { stamp: "1.0", status: gated(), board: "<html>502</html>", boardCode: 502 } });
+  await s.poller.tick(["devbox"]);
+  s.machines.devbox.board = { detail: "Unauthorized" };
+  s.machines.devbox.boardCode = 401;
+  s.advance(30000);
+  await s.poller.tick(["devbox"]);
+  assert.equal(s.count("/board"), 2);
+  assert.equal(s.count("/diagnostics"), 0);
+});
