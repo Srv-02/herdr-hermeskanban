@@ -8,8 +8,11 @@ included as `mods/hermes-kanban/icons/LICENSE`.
 Source: https://github.com/Srv-02/herdr-ghchecker. Same author, same license.
 Adopted and adapted: the lint script (`scripts/lint.mjs`, `scripts/hoverids.mjs`), the test harness (`test/no-network.js`,
 `test/no-intl.js`, `test/tmp-helper.js`, `test/tmp-helper.test.js`), the CI workflow (`.github/workflows/ci.yml`), the
-license file, the Buy me a coffee button (`screenshots/bmc-button.png`) and, in the same way, the panel, the tab bar button and the update
-check as they come in.
+license file, the Buy me a coffee button (`screenshots/bmc-button.png`); in the mod, the panel's layout, header buttons and
+tab bar button (`mods/hermes-kanban/main.js`), the shared pieces (`mods/hermes-kanban/ui.js`), the settings dialog
+(`mods/hermes-kanban/settings.js`, its layout itself from Filer Pro by the same author, https://github.com/Srv-02/herdr-filerpro,
+MIT), the update check (`mods/hermes-kanban/lib/update.js`), the lease (`mods/hermes-kanban/lib/lease.js`) and the settings
+schema (`mods/hermes-kanban/lib/settings.js`).
 
 ```
 MIT License

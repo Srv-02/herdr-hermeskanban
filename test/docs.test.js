@@ -43,6 +43,48 @@ test("GUIDE has the anchors the README and the mod link to", () => {
   }
 });
 
-test("RECIPE has the five sections of the published mods", () => {
-  assert.deepEqual(headings("RECIPE.md").slice(1), ["## What you see", "## How it behaves", "## Built from", "## Watch out", "## Done when"]);
+test("RECIPE has the sections of the published mods", () => {
+  assert.deepEqual(headings("RECIPE.md").filter((h) => h.startsWith("## ")), ["## What you see", "## How it behaves", "## Built from", "## Watch out", "## Done when"]);
+});
+
+test("README has one subsection per feature area under Features", () => {
+  const lines = readme.split("\n"), from = lines.indexOf("## Features"), to = lines.indexOf("## Documentation");
+  assert.deepEqual(lines.slice(from, to).filter((l) => l.startsWith("### ")),
+    ["### Board", "### Task overlay", "### Notifications", "### Set up access", "### Settings", "### And"]);
+});
+
+// The commands main.js answers from nextCommand(): every `c === "<command>"`.
+const commands = () => [...read("mods/hermes-kanban/main.js").matchAll(/\bc === "([a-z-]+)"/g)].map((m) => m[1]);
+
+test("GUIDE lists every key command of the mod", () => {
+  const guide = read("docs/GUIDE.md"), list = commands();
+  assert.ok(list.length >= 5, `found only ${list.length} commands in main.js`);
+  assert.deepEqual(list.filter((c) => !guide.includes(`\`hermes-kanban:${c}\``)), []);
+});
+
+test("GUIDE names every setting of lib/settings.js", async () => {
+  const { SETTINGS } = await import("../mods/hermes-kanban/lib/settings.js");
+  const guide = read("docs/GUIDE.md");
+  assert.deepEqual(SETTINGS.filter((s) => !guide.includes(`\`${s.key}\``) || !guide.includes(s.label)).map((s) => s.key), []);
+});
+
+test("GUIDE has no placeholder left", () => {
+  assert.doesNotMatch(read("docs/GUIDE.md"), /Filled in with/);
+  assert.doesNotMatch(read("RECIPE.md"), /scaffold/i);
+});
+
+test("no internal words in the docs", () => {
+  const docs = ["README.md", "docs/GUIDE.md", "RECIPE.md", "THIRD_PARTY_NOTICES.md"];
+  const deny = path.join(ROOT, "tmp/denylist.txt");
+  // The password manager's name is split so this file does not trip the same check in lint.
+  const words = [["1", "Password"].join(""), ...(fs.existsSync(deny) ? fs.readFileSync(deny, "utf8").split("\n").map((w) => w.trim()).filter(Boolean) : [])];
+  const escape = (w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const bad = [];
+  for (const f of docs) {
+    read(f).split("\n").forEach((line, n) => {
+      // Reports the file and line only, never the word: the list stays local.
+      if (words.some((w) => new RegExp(`(?<![\\w])${escape(w)}(?![\\w])`, "i").test(line))) bad.push(`${f}:${n + 1}`);
+    });
+  }
+  assert.deepEqual(bad, []);
 });
