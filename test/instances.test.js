@@ -80,12 +80,28 @@ test("jumpTarget: null for a machine without open space", () => {
   assert.equal(jumpTarget("devbox", { spaces: [{ id: "s1", machine: "devbox", tabs: [] }], panes }, {}), null);
 });
 
+test("jumpTarget: without a Hermes pane, a terminal pane before a mod pane", () => {
+  const modFirst = [{ pane: "labbox/m1", terminal: null, mod: "hermes-kanban", tab: "t3" }, ...panes];
+  assert.deepEqual(jumpTarget("labbox", { spaces, panes: modFirst }, {}), { pane: "labbox/p4" });
+  const modOnly = [{ pane: "labbox/m1", terminal: null, mod: "hermes-kanban", tab: "t3" }];
+  assert.deepEqual(jumpTarget("labbox", { spaces, panes: modOnly }, {}), { pane: "labbox/m1" });
+});
+
 test("rememberPane ignores non-Hermes focus", () => {
   const lp = { devbox: "devbox/p1" };
-  const next = rememberPane(lp, { machine: "devbox", pane: "devbox/p3", hermes: true });
+  const next = rememberPane(lp, { machine: "devbox", pane: "devbox/p3", hermes: true }, panes);
   assert.deepEqual(next, { devbox: "devbox/p3" });
   assert.notEqual(next, lp);
   assert.deepEqual(lp, { devbox: "devbox/p1" });
-  assert.deepEqual(rememberPane(lp, { machine: "devbox", pane: null, hermes: false }), lp);
-  assert.deepEqual(rememberPane(lp, { machine: null, pane: "p5", hermes: true }), lp);
+  assert.equal(rememberPane(next, { machine: "devbox", pane: "devbox/p3", hermes: true }, panes), next, "unchanged: the same map");
+  assert.deepEqual(rememberPane(lp, { machine: "devbox", pane: null, hermes: false }, panes), lp);
+  assert.deepEqual(rememberPane(lp, { machine: null, pane: "p5", hermes: true }, panes), lp);
+});
+
+test("rememberPane keeps only pane ids, never a terminal block's address", () => {
+  const lp = { devbox: "devbox/p1" };
+  // A layout terminal block without a pane: focusedInstance names it by its address.
+  assert.equal(rememberPane(lp, { machine: "devbox", pane: "devbox/t7", hermes: true }, panes), lp);
+  assert.equal(rememberPane(lp, { machine: "devbox", pane: "devbox/x3", hermes: true }, panes), lp);
+  assert.equal(rememberPane(lp, { machine: "devbox", pane: "devbox/p3", hermes: true }, undefined), lp);
 });

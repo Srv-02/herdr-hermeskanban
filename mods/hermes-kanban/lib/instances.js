@@ -32,18 +32,23 @@ export function focusedInstance({ spaces, panes, focused }, last = null) {
   return { machine, pane: terminal?.pane ?? f.pane ?? f.terminal, hermes: true };
 }
 
-// Where "go to this instance" lands: the last focused Hermes pane there, else its first Hermes pane,
-// else the first pane of any space on that machine. Null for a machine without open space or pane.
+// Where "go to this instance" lands: the last focused Hermes pane there, else its first Hermes pane, else the first
+// terminal pane, else the first pane (a mod pane) of any space on that machine. Null for a machine without open space
+// or pane.
 export function jumpTarget(machine, { spaces, panes }, lastPanes) {
   const tabs = new Set((spaces ?? []).filter((s) => s.machine === machine).flatMap((s) => (s.tabs ?? []).map((t) => t.id)));
   const here = (panes ?? []).filter((p) => tabs.has(p.tab));
   const remembered = here.find((p) => p.pane === lastPanes?.[machine] && isHermes(p));
-  const pick = remembered ?? here.find(isHermes) ?? here[0];
+  const pick = remembered ?? here.find(isHermes) ?? here.find((p) => p.terminal) ?? here[0];
   return pick ? { pane: pick.pane } : null;
 }
 
-// A new map with the focused Hermes pane remembered per machine. Anything but a Hermes focus changes nothing.
-export function rememberPane(lastPanes, focus) {
+// A new map with the focused Hermes pane remembered per machine. Anything but a Hermes focus changes nothing, and so
+// does a focus whose id is no terminal pane in `panes`: a layout terminal block without a pane is named by its
+// terminal address, which pane.focus {pane} would not find.
+export function rememberPane(lastPanes, focus, panes) {
   if (!focus?.hermes || focus.machine == null || !focus.pane) return lastPanes;
+  if (!(panes ?? []).some((p) => p.pane === focus.pane && p.terminal)) return lastPanes;
+  if (lastPanes?.[focus.machine] === focus.pane) return lastPanes;
   return { ...lastPanes, [focus.machine]: focus.pane };
 }
