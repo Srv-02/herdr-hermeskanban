@@ -43,7 +43,7 @@ Instead of the list, blankslates (icon 22px, title semibold, lines text 12 `t.mu
 - **Untrusted text** (`lib/text.js`): titles, bodies, comments and reasons are escaped; only `<br>` and `<a href="https://…">` for bare https URLs are made; `openUrl` opens only `https` and only on a click. No Markdown renderer.
 - **Settings** (`lib/settings.js`): one schema (key, type, default, label, about) for `single_agent`, `status.color`, `toast.needs_you`, `toast.done`, `sound.needs_you`, `sound.done`, `badge`, `poll_seconds`, `update_check`; file `appHome()/hermes-kanban.json`, nested or dotted keys, a wrong value means its default; saved with `writeTextFile` against the text read (never over a broken file), then shared `hermes-kanban.config`.
 - **Update check** (`lib/update.js`, from ghchecker): the lease holder at most hourly runs a pass; a request to `https://api.github.com/repos/Srv-02/herdr-hermeskanban/releases/latest` only when the last is 24 h old, the installed version (from `mods/hermes-kanban/mod.json`) changed or the clock moved back. Result in shared `hermes-kanban.update` `{ at, local, latest }`.
-- **Commands** (`nextCommand`, for keys.json `hermes-kanban:<command>`): `refresh`, `filter` (the second filter row), `settings`, `new`, `open` (the first row).
+- **Commands** (`nextCommand`, for keys.json `hermes-kanban.<command>`): `refresh`, `filter` (the second filter row), `settings`, `new`, `open` (the first row).
 
 ## Built from
 

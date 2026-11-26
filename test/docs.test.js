@@ -59,7 +59,15 @@ const commands = () => [...read("mods/hermes-kanban/main.js").matchAll(/\bc === 
 test("GUIDE lists every key command of the mod", () => {
   const guide = read("docs/GUIDE.md"), list = commands();
   assert.ok(list.length >= 5, `found only ${list.length} commands in main.js`);
-  assert.deepEqual(list.filter((c) => !guide.includes(`\`hermes-kanban:${c}\``)), []);
+  assert.deepEqual(list.filter((c) => !guide.includes(`\`hermes-kanban.${c}\``)), []);
+});
+
+// keys.json: "<name>:<value>" is an app command with its first argument; a mod's command is "<mod>.<command>"
+// (AGENTS.md, Keys). No text of the repo may show the colon form for this mod's commands.
+test("docs and code name the key commands as hermes-kanban.<command>", () => {
+  for (const f of ["README.md", "RECIPE.md", "docs/GUIDE.md", "mods/hermes-kanban/main.js"]) {
+    assert.doesNotMatch(read(f), /hermes-kanban:[a-z<]/, f);
+  }
 });
 
 test("GUIDE names every setting of lib/settings.js", async () => {

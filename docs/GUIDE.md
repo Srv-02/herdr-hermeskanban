@@ -210,15 +210,15 @@ For an instance with one agent. Switch it on in the settings while the panel sho
 
 ## Keys
 
-The panel takes these commands, for `keys.json` (`"alt-h r": "hermes-kanban:refresh"`) or `herdr-app do hermes-kanban.<command>`:
+The panel takes these commands, for `keys.json` (`"alt-h r": "hermes-kanban.refresh"`) or `herdr-app do hermes-kanban.<command>`:
 
 | Command | What it does |
 |---|---|
-| `hermes-kanban:refresh` | Polls the shown instance now |
-| `hermes-kanban:filter` | Shows or hides the second filter row (priority and grouping) |
-| `hermes-kanban:settings` | Opens the Settings dialog |
-| `hermes-kanban:new` | Opens `New task` on the shown instance |
-| `hermes-kanban:open` | Opens the first task of the list in its overlay |
+| `hermes-kanban.refresh` | Polls the shown instance now |
+| `hermes-kanban.filter` | Shows or hides the second filter row (priority and grouping) |
+| `hermes-kanban.settings` | Opens the Settings dialog |
+| `hermes-kanban.new` | Opens `New task` on the shown instance |
+| `hermes-kanban.open` | Opens the first task of the list in its overlay |
 
 ## Settings
 
