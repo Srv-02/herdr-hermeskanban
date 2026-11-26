@@ -391,3 +391,11 @@ test("the filter button marks hidden filters with ghchecker's dot", () => {
   assert.match(src, /\{ marked: hiddenSet \}/);
   assert.match(src, /\.when\(marked \|\| alarm \|\| gold, \(e\) => e\.child\(div\(\)\.absolute\(\)\.top\(2\)\.right\(2\)\.size\(6\)\.rounded\(3\)\.bg\(gold \? GOLD : alarm \? c\.red : t\.muted\)\)\)/);
 });
+
+// Nachträge 4: the new task dialog is as tall as its content (no fixed height) and its description field taller.
+test("the new task dialog sizes to its content", () => {
+  const main = source("main.js"), create = source("create.js");
+  assert.match(main, /openCreate\(machine\) \{\n    openOverlay\(\{ mod: MOD, kind: "dialog", modal: true, frame: "none", width: 560, props: \{ create: \{ machine \} \} \}\);/);
+  assert.match(create, /this\.body\.set_auto_grow\(8, 14\)/);
+  assert.doesNotMatch(create, /id\("create"\)\.size_full\(\)/);
+});

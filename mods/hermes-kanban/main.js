@@ -140,7 +140,7 @@ export default class HermesKanban extends View {
     openOverlay({ mod: MOD, kind: "dialog", width: 0.88, height: 0.9, props: { task: { machine: task.machine, id: task.id } } });
   }
   openCreate(machine) {
-    openOverlay({ mod: MOD, kind: "dialog", modal: true, frame: "none", width: 560, height: 0.9, props: { create: { machine } } });
+    openOverlay({ mod: MOD, kind: "dialog", modal: true, frame: "none", width: 560, props: { create: { machine } } });
   }
   // The settings edit the instance the panel shows (null: none, only the settings of all instances).
   openSettings(machine) {

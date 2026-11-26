@@ -25,7 +25,7 @@ export class CreateDialog {
     this.title.on("change", (_e, cx) => { const any = Boolean(this.title.value().trim()); if (any !== this.typed) { this.typed = any; cx.notify(); } });
     this.title.on("submit", (_e, cx) => this.create(cx));
     this.body = TextareaState.new({ placeholder: "Description (optional)" });
-    this.body.set_auto_grow(5, 14);
+    this.body.set_auto_grow(8, 14);
     this.body.on("submit", (e, cx) => { if (e.secondary) this.create(cx); });
     if (checking()) return;
     this.title.focus();
@@ -116,13 +116,13 @@ export class CreateDialog {
         .child(button("cancel", "Cancel", t, () => closeOverlay(this.overlay)))
         .child(button("create", busy ? "Creating…" : "Create", t, (_e, cx) => this.create(cx), { primary: true, enabled: Boolean(this.typed) && !busy }));
 
-    return v_flex().id("create").size_full().min_h(0).rounded(12).overflow_hidden().border_1().border_color(t.border)
+    return v_flex().id("create").w_full().rounded(12).overflow_hidden().border_1().border_color(t.border)
       .bg(t.background).text_color(t.foreground).text_size(13)
       .child(h_flex().flex_none().px(20).pt(18).pb(14).gap(10).items_center().border_b(1).border_color(t.border)
         .child(div().text_size(16).font_semibold().child("New task"))
         .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.dim).child(`on ${this.machine}`))
         .child(button("close-overlay", "", t, () => closeOverlay(this.overlay), { icon: "close", tooltip: "Close (Esc)" })))
-      .child(v_flex().id("create-body").flex_1().min_h(0).overflow_y_scrollbar().px(20).py(16).gap(16)
+      .child(v_flex().id("create-body").flex_none().px(20).py(16).gap(16)
         .child(field("Title", boxed("title", Input.new(this.title).w_full().text_size(13).text_color(t.foreground)), "Required."))
         .child(field("Description", boxed("body", Textarea.new(this.body).w_full().text_size(13).text_color(t.foreground)), "Ctrl+Enter creates the task."))
         .child(field("Priority", segmented("prio", prioChoices(this.priority), this.priority, t, (n, cx) => { this.priority = n; cx.notify(); }),
