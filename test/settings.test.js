@@ -1,0 +1,101 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  SETTINGS, CONFIG_FILE, parseSettings, defaults, loadSettings, withSettings, saveSettings, changedSettings, isSingleAgent,
+} from "../mods/hermes-kanban/lib/settings.js";
+
+test("defaults", () => assert.deepEqual(defaults(), { single_agent: [], "status.color": "color", "toast.needs_you": true,
+  "toast.done": true, "sound.needs_you": true, "sound.done": false, badge: false, poll_seconds: 30, update_check: true }));
+
+test("every setting has a key, a type, a default and a description", () => {
+  assert.equal(CONFIG_FILE, "hermes-kanban.json");
+  for (const s of SETTINGS) {
+    assert.match(s.key, /^[a-z_]+(\.[a-z_]+)?$/);
+    assert.ok(["boolean", "machines", "choice"].includes(s.type), s.key);
+    assert.ok(s.label, s.key);
+    assert.ok(s.about.length > 10, s.key);
+    assert.ok("default" in s, s.key);
+  }
+  assert.match(SETTINGS.find((s) => s.key === "update_check").about, /Once a day, Hermes Kanban asks GitHub/);
+});
+
+test("a missing or empty file means the defaults, without problems", () => {
+  for (const text of [null, undefined, "", "  \n"]) assert.deepEqual(parseSettings(text), { values: defaults(), problems: [] });
+});
+
+test("nested and dotted keys", () => {
+  assert.deepEqual(parseSettings('{ "status": { "color": "mono" }, "toast": { "done": false }, "single_agent": [" devbox ", "devbox", ""] }').values,
+    { ...defaults(), "status.color": "mono", "toast.done": false, single_agent: ["devbox"] });
+  assert.equal(parseSettings('{ "sound.done": true }').values["sound.done"], true);
+});
+
+test("a wrong poll_seconds means the default", () => {
+  for (const v of ["30", 45, 0, -15, null, true]) {
+    const r = parseSettings(JSON.stringify({ poll_seconds: v }));
+    assert.equal(r.values.poll_seconds, 30, String(v));
+    assert.deepEqual(r.problems, ["poll_seconds"], String(v));
+  }
+  for (const v of [15, 30, 60, 120]) assert.equal(parseSettings(JSON.stringify({ poll_seconds: v })).values.poll_seconds, v);
+});
+
+test("broken values fall back to the default and are named", () => {
+  const r = parseSettings('{ "single_agent": ["ok", 3], "status": { "color": "rainbow" }, "badge": "yes" }');
+  assert.deepEqual(r.values, defaults());
+  assert.deepEqual(r.problems, ["single_agent", "status.color", "badge"]);
+  assert.deepEqual(parseSettings("{ not json").problems, ["hermes-kanban.json"]);
+  assert.deepEqual(parseSettings("[1, 2]").values, defaults());
+  assert.deepEqual(parseSettings('{ "other": 1 }'), { values: defaults(), problems: [] }, "unknown keys are left alone");
+});
+
+test("defaults are fresh copies", () => {
+  const a = defaults(); a.single_agent.push("x");
+  assert.deepEqual(defaults().single_agent, []);
+});
+
+test("isSingleAgent is per machine", () => {
+  const s = { ...defaults(), single_agent: ["devbox"] };
+  assert.equal(isSingleAgent(s, "devbox"), true);
+  assert.equal(isSingleAgent(s, "labbox"), false);
+  assert.equal(isSingleAgent(defaults(), "devbox"), false);
+  assert.equal(isSingleAgent(null, "devbox"), false);
+  assert.equal(isSingleAgent({ single_agent: "devbox" }, "devbox"), false, "only a list counts");
+});
+
+test("loadSettings reads hermes-kanban.json in the app folder; a failed read means the defaults", async () => {
+  const asked = [];
+  const r = await loadSettings(async (p) => { asked.push(p); return '{ "poll_seconds": 60 }'; }, () => "/app");
+  assert.deepEqual(asked, ["/app/hermes-kanban.json"]);
+  assert.equal(r.values.poll_seconds, 60);
+  assert.deepEqual((await loadSettings(async () => null, () => "/app")).values, defaults());
+  assert.deepEqual((await loadSettings(async () => { throw new Error("denied"); }, () => "/app")).values, defaults());
+});
+
+test("withSettings writes nested keys and keeps the rest", () => {
+  const out = JSON.parse(withSettings('{ "other": 1, "toast.done": true }', { "toast.done": false, "status.color": "mono", single_agent: ["devbox"], poll_seconds: 60 }));
+  assert.deepEqual(out, { other: 1, "toast.done": false, status: { color: "mono" }, single_agent: ["devbox"], poll_seconds: 60 });
+  assert.deepEqual(JSON.parse(withSettings(null, { badge: true })), { badge: true });
+  assert.throws(() => withSettings("{}", { poll_seconds: 45 }), /not a setting/);
+  assert.throws(() => withSettings("{}", { nope: true }), /not a setting/);
+});
+
+test("withSettings never overwrites a broken file", async () => {
+  assert.throws(() => withSettings("{ broken", { badge: true }));
+  assert.throws(() => withSettings("[1]", { badge: true }), /not a JSON object/);
+  const writes = [];
+  await assert.rejects(saveSettings({ badge: true }, {
+    readTextFile: async () => "{ broken", writeTextFile: async (...a) => { writes.push(a); }, appHome: () => "/app",
+  }));
+  assert.deepEqual(writes, []);
+});
+
+test("saveSettings reads, then writes only if the file is unchanged (expected text)", async () => {
+  const calls = [];
+  await saveSettings({ poll_seconds: 15 }, { readTextFile: async () => null, writeTextFile: async (...a) => { calls.push(a); }, appHome: () => "/app" });
+  assert.deepEqual(calls, [["/app/hermes-kanban.json", '{\n  "poll_seconds": 15\n}\n', null]]);
+});
+
+test("changedSettings: only what differs goes to the file", () => {
+  const before = defaults();
+  assert.deepEqual(changedSettings(before, { ...before }), {});
+  assert.deepEqual(changedSettings(before, { ...before, badge: true, single_agent: ["devbox"] }), { badge: true, single_agent: ["devbox"] });
+});
