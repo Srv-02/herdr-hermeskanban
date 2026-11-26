@@ -57,3 +57,32 @@ export function dotOf(boards, unseen) {
   if (tasks.some((t) => t.status === "running")) return { tone: "yellow", count: 0 };
   return { tone: null, count: 0 };
 }
+
+// What one watcher pass tells the person: the toasts their switches allow (failed follows "needs you") and at most one
+// sound, herdr's "blocked" before its "done". Sounds have their own switches, independent of the toasts.
+export function alertsOf(changes, settings) {
+  const urgent = (c) => c.kind !== "done";
+  const toasts = changes.filter((c) => settings?.[urgent(c) ? "toast.needs_you" : "toast.done"] === true);
+  let sound = null;
+  if (settings?.["sound.needs_you"] === true && changes.some(urgent)) sound = "blocked";
+  else if (settings?.["sound.done"] === true && changes.some((c) => !urgent(c))) sound = "done";
+  return { toasts, sound };
+}
+
+// Finished tasks not looked at yet, per machine: each done change adds one. Only visible machines keep a count, so a
+// machine whose last space closed loses its green too.
+export function countUnseen(unseen, changes, machines) {
+  const out = {};
+  for (const m of machines) {
+    const n = unseen?.[m];
+    if (Number.isInteger(n) && n >= 0) out[m] = n;
+  }
+  for (const c of changes) if (c.kind === "done" && machines.includes(c.machine)) out[c.machine] = (out[c.machine] ?? 0) + 1;
+  return out;
+}
+
+// The boards of the poller's snapshots (Record<machine, Snapshot>), for dotOf: a snapshot without a board drops out.
+export const boardsOf = (snapshots) => Object.fromEntries(Object.entries(snapshots ?? {}).filter(([, s]) => s?.board).map(([m, s]) => [m, s.board]));
+
+// The Dock badge: the count of the red dot, else none.
+export const badgeOf = (dot) => dot.count > 0 ? String(dot.count) : null;

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { STAMP_SCRIPT, parseStamp, diffBoards, toastOf, dotOf } from "../mods/hermes-kanban/lib/changes.js";
+import { STAMP_SCRIPT, parseStamp, diffBoards, toastOf, dotOf, alertsOf, countUnseen, boardsOf, badgeOf } from "../mods/hermes-kanban/lib/changes.js";
 
 const t = (id, o = {}) => ({
   machine: "devbox", id, title: `title ${id}`, status: "todo", assignee: "writer", failure: null, failures: 0, warnings: [], ...o,
@@ -101,4 +101,45 @@ test("diffBoards: at most one change per task, failed wins", () => {
   const prev = board("devbox", [t("t_1", { status: "running" })]);
   const next = board("devbox", [t("t_1", { status: "blocked", failures: 1, failure: "crashed", warnings: ["block_unblock_cycling"] })]);
   assert.deepEqual(diffBoards(prev, next).map((x) => [x.id, x.kind, x.failure]), [["t_1", "failed", "crashed"]]);
+});
+
+const ch = (kind, o = {}) => ({ machine: "devbox", id: `t_${kind}`, title: kind, agent: "writer", kind, text: kind, failure: null, ...o });
+const on = { "toast.needs_you": true, "toast.done": true, "sound.needs_you": true, "sound.done": true };
+
+test("alertsOf: toasts follow their switch, failed follows needs_you", () => {
+  const all = [ch("needs_you"), ch("failed"), ch("done")];
+  assert.deepEqual(alertsOf(all, on).toasts.map((c) => c.kind), ["needs_you", "failed", "done"]);
+  assert.deepEqual(alertsOf(all, { ...on, "toast.done": false }).toasts.map((c) => c.kind), ["needs_you", "failed"]);
+  assert.deepEqual(alertsOf(all, { ...on, "toast.needs_you": false }).toasts.map((c) => c.kind), ["done"]);
+  assert.deepEqual(alertsOf([], on), { toasts: [], sound: null });
+});
+
+test("alertsOf: one sound per pass, blocked before done, each on its own switch", () => {
+  assert.equal(alertsOf([ch("done"), ch("needs_you")], on).sound, "blocked");
+  assert.equal(alertsOf([ch("failed")], on).sound, "blocked");
+  assert.equal(alertsOf([ch("done")], on).sound, "done");
+  assert.equal(alertsOf([ch("done"), ch("needs_you")], { ...on, "sound.needs_you": false }).sound, "done");
+  assert.equal(alertsOf([ch("needs_you")], { ...on, "sound.needs_you": false }).sound, null);
+  assert.equal(alertsOf([ch("done")], { ...on, "sound.done": false }).sound, null);
+  // the sound does not depend on the toast switch
+  assert.equal(alertsOf([ch("done")], { ...on, "toast.done": false }).sound, "done");
+});
+
+test("countUnseen: done changes add up per machine, machines out of view drop out", () => {
+  const changes = [ch("done"), ch("done", { id: "t_2" }), ch("needs_you"), ch("done", { machine: "labbox" })];
+  assert.deepEqual(countUnseen({ devbox: 1, gone: 4 }, changes, ["devbox", "labbox"]), { devbox: 3, labbox: 1 });
+  assert.deepEqual(countUnseen({ devbox: 2 }, [], ["devbox"]), { devbox: 2 });
+  assert.deepEqual(countUnseen(null, [ch("done", { machine: "nobox" })], ["devbox"]), {});
+  assert.deepEqual(countUnseen({ devbox: "x" }, [], ["devbox"]), {}, "a broken count is dropped");
+});
+
+test("boardsOf: the boards of the snapshots that have one", () => {
+  const b = board("devbox", [t("a")]);
+  assert.deepEqual(boardsOf({ devbox: { machine: "devbox", board: b }, labbox: { machine: "labbox", board: null } }), { devbox: b });
+  assert.deepEqual(boardsOf(null), {});
+});
+
+test("badgeOf: the count of the red dot, else nothing", () => {
+  assert.equal(badgeOf({ tone: "red", count: 3 }), "3");
+  assert.equal(badgeOf({ tone: "green", count: 0 }), null);
 });

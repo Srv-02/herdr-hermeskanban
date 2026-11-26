@@ -1,0 +1,96 @@
+// The watcher: the glue of the poller (lib/poller.js) to herdr. One pass polls every visible instance that is due,
+// shares the snapshots, counts what finished unseen, posts the toasts and sounds of the changes and sets the Dock
+// badge. The button role in main.js runs it from its timer, only in the copy that holds the lease, and never during
+// herdr-app check; this file registers no timer.
+//
+// Shared keys: hermes-kanban.boards (Record<machine, Snapshot>), hermes-kanban.unseen (Record<machine, number>),
+// hermes-kanban.lastPanes (Record<machine, paneId>), written here; hermes-kanban.seen ({ machine, at }, the panel),
+// hermes-kanban.refresh ({ machine, at }, panel or overlay after an action), hermes-kanban.config ({ at }, after
+// Save in the settings), read here.
+import { spaces, panes, focused, exec, notify, playSound, setBadge, shared, setShared, readTextFile, appHome } from "herdr";
+import { createApi } from "./lib/api.js";
+import { createPoller } from "./lib/poller.js";
+import { loadSettings } from "./lib/settings.js";
+import { visibleMachines, focusedInstance, jumpTarget, rememberPane } from "./lib/instances.js";
+import { toastOf, dotOf, alertsOf, countUnseen, boardsOf, badgeOf } from "./lib/changes.js";
+
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+// The poller and its API, made at the first pass. A copy that newly holds the lease starts here with no boards, so
+// its first poll of each machine only sets the baseline: no toasts for what happened before.
+function start(w) {
+  let poller = null;
+  const api = createApi(exec, (machine) => poller.mode(machine));
+  poller = createPoller({ api, run: (s) => exec(s.cmd, s.args, s.opts), now: Date.now, settings: () => w.settings });
+  w.poller = poller;
+  // Marks set before this copy watched are old news.
+  w.seenAt = shared("hermes-kanban.seen")?.at;
+  w.refreshAt = shared("hermes-kanban.refresh")?.at;
+}
+
+async function once(w) {
+  if (!w.poller) start(w);
+  const config = shared("hermes-kanban.config");
+  if (!w.settings || (config?.at && config.at !== w.configAt)) {
+    w.configAt = config?.at;
+    w.settings = (await loadSettings(readTextFile, appHome)).values;
+  }
+  const refresh = shared("hermes-kanban.refresh");
+  if (refresh?.at && refresh.at !== w.refreshAt) {
+    w.refreshAt = refresh.at;
+    if (typeof refresh.machine === "string") w.poller.refresh(refresh.machine);
+  }
+
+  // Where a toast's click goes: the Hermes pane last focused on its machine.
+  const view = { spaces: spaces(), panes: panes() };
+  const before = shared("hermes-kanban.lastPanes") ?? {};
+  const lastPanes = rememberPane(before, focusedInstance({ ...view, focused: focused() }), view.panes);
+  if (lastPanes !== before) setShared("hermes-kanban.lastPanes", lastPanes);
+
+  const machines = visibleMachines(view.spaces);
+  const { snapshots, changes } = await w.poller.tick(machines);
+
+  // Opening the panel of an instance clears its green: the panel marks it seen, and that zeroes its count.
+  let unseen = shared("hermes-kanban.unseen") ?? {};
+  const seen = shared("hermes-kanban.seen");
+  if (seen?.at && seen.at !== w.seenAt) {
+    w.seenAt = seen.at;
+    if (typeof seen.machine === "string") unseen = { ...unseen, [seen.machine]: 0 };
+  }
+  unseen = countUnseen(unseen, changes, machines);
+  // Each write re-renders every mod: only what changed.
+  if (!same(unseen, shared("hermes-kanban.unseen"))) setShared("hermes-kanban.unseen", unseen);
+  if (!same(snapshots, shared("hermes-kanban.boards"))) setShared("hermes-kanban.boards", snapshots);
+
+  const { toasts, sound } = alertsOf(changes, w.settings);
+  for (const c of toasts) {
+    const target = jumpTarget(c.machine, view, lastPanes);
+    notify({ ...toastOf(c), timeout: 8000, ...(target ? { action: { name: "pane.focus", args: target } } : {}) });
+  }
+  if (sound) playSound(sound);
+
+  // The badge is the app's, shared by every mod: cleared only when this copy set it.
+  const badge = w.settings.badge ? badgeOf(dotOf(boardsOf(snapshots), unseen)) : null;
+  if ((w.settings.badge || w.badge != null) && badge !== w.badge) {
+    setBadge(badge);
+    w.badge = badge;
+  }
+}
+
+// One pass over the visible instances. `w` is the watcher's state, kept by the button between passes. While a pass
+// runs, the timer's next one is skipped; one asked for with `queue` (a refresh after an action) runs right after it.
+export async function watchPass(w, queue = false) {
+  if (w.busy) {
+    if (queue) w.again = true;
+    return;
+  }
+  w.busy = true;
+  try {
+    do {
+      w.again = false;
+      await once(w);
+    } while (w.again);
+  } finally {
+    w.busy = false;
+  }
+}
