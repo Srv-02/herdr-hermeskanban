@@ -9,7 +9,9 @@ import { View, div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, v_virtual_list, Scrollbar } from "gpui-base";
 import { spaces, panes, focused, layout, theme, openOverlay, closeOverlay, props, shared, setShared, run, nextCommand, checking, readTextFile, appHome, window as hostWindow } from "herdr";
 import { watchPass } from "./watcher.js";
-import { tones, alpha, glyph, glyphOf, segmented, chip, blankslate, GOLD } from "./ui.js";
+import { TaskViewer } from "./viewer.js";
+import { CreateDialog } from "./create.js";
+import { tones, alpha, glyph, glyphOf, segmented, chip, blankslate, look, GOLD } from "./ui.js";
 import { dotOf, boardsOf } from "./lib/changes.js";
 import { loadSettings, defaults, isSingleAgent } from "./lib/settings.js";
 import { createUpdateGate, updateCheck, fetchLatest, localVersion, gearState } from "./lib/update.js";
@@ -63,8 +65,11 @@ export default class HermesKanban extends View {
       return;
     }
     if (p.menu) { this.menu = { ...p.menu, overlay: p.overlay }; return; }
-    // The task overlay, the new task and the settings dialog come in their own step; until then a plain note.
-    if (p.task || p.create || p.settings) { this.later = true; return; }
+    // The task overlay (viewer.js) and the new task (create.js) take their machine from the props, never the focus.
+    if (p.task) { this.viewer = new TaskViewer(p.task, p.overlay, cx); return; }
+    if (p.create) { this.creator = new CreateDialog(p.create, p.overlay, cx); return; }
+    // The settings dialog comes in its own step; until then a plain note.
+    if (p.settings) { this.later = true; return; }
     this.panel(cx);
   }
 
@@ -128,7 +133,7 @@ export default class HermesKanban extends View {
 
   // ---- opening ----
   openTask(task) {
-    openOverlay({ mod: MOD, kind: "dialog", width: 0.86, height: 0.88, props: { task: { machine: task.machine, id: task.id } } });
+    openOverlay({ mod: MOD, kind: "dialog", width: 0.88, height: 0.9, props: { task: { machine: task.machine, id: task.id } } });
   }
   openCreate(machine) {
     openOverlay({ mod: MOD, kind: "dialog", modal: true, frame: "none", width: 560, height: 0.9, props: { create: { machine } } });
@@ -309,14 +314,6 @@ export default class HermesKanban extends View {
         .child(segmented("group", [["status", "Status"], ["agent", "Agent"], ["none", "None"]], this.f.group, t, pick((k) => ({ group: k })))));
   }
 
-  // A status's icon and color: blocked and review the red alert ("needs you", red also in Mono), running turns, done
-  // checked, the others a dot. Mono draws everything else in the theme's muted color.
-  look(status, t, c, mono) {
-    if (NEEDS_YOU.includes(status)) return { icon: "alert", color: c.red };
-    const color = mono ? t.muted : ({ triage: c.orange, ready: c.blue, running: c.yellow, done: c.magenta }[status] ?? t.muted);
-    return { icon: status === "running" ? "running" : status === "done" ? "check-circle" : "circle-dot", color };
-  }
-
   // ---- drawing: the list ----
   // Rows have a fixed height so the list can be virtual. A virtual list's rows take no handlers; the list reports
   // clicks by key. Each row carries its key (lib/board.js taskKey: machine and ID) as id: GPUI repaints a hover change
@@ -325,7 +322,7 @@ export default class HermesKanban extends View {
     return h_flex().id(key).h(size).w_full().flex_none().px(8).gap(9).items_center().rounded(7).cursor_pointer().overflow_hidden().hover((s) => s.bg(t.hover));
   }
   taskRow(task, key, size, x) {
-    const { t, c, mono } = x, s = this.look(task.status, t, c, mono), hint = hintOf(task, x.defaultAssignee), prio = prioLabel(task.priority);
+    const { t, c, mono } = x, s = look(task.status, t, c, mono), hint = hintOf(task, x.defaultAssignee), prio = prioLabel(task.priority);
     const age = ago(task.status === "done" ? task.completedAt ?? task.createdAt : task.createdAt, Date.now() / 1000);
     const meta = [task.id, task.assignee ?? "—", age].filter(Boolean).join(" · ");
     const tint = hint && (hint.tone === "red" ? c.red : mono ? t.muted : c[hint.tone] ?? t.muted);
@@ -343,7 +340,7 @@ export default class HermesKanban extends View {
   heading(g, size, x) {
     const { t, c, mono } = x, status = this.f.group === "status";
     return h_flex().h(size).w_full().flex_none().px(8).pt(8).gap(7).items_center().text_size(12)
-      .when(status, (e) => e.child(div().size(7).flex_none().rounded(4).bg(this.look(g.key, t, c, mono).color)))
+      .when(status, (e) => e.child(div().size(7).flex_none().rounded(4).bg(look(g.key, t, c, mono).color)))
       .child(div().min_w(0).truncate().font_semibold().child(g.label))
       .child(div().flex_none().text_color(t.muted).child(String(g.count)))
       .child(div().flex_1())
@@ -433,6 +430,8 @@ export default class HermesKanban extends View {
       return this.toolbar(t);
     }
     if (this.menu) return this.renderMenu(t);
+    if (this.viewer) return this.viewer.render(cx);
+    if (this.creator) return this.creator.render(cx);
     if (this.later) return this.shell(t).child(blankslate(t, { title: "Not available yet" }));
 
     this.drawnAt = Date.now();

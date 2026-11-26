@@ -122,7 +122,7 @@ test("the panel's follow-me timer runs after a checking() guard", () => {
 // Overlays carry only machine and ID: the overlay fetches the task itself and acts on that machine only.
 test("the panel opens its overlays with the source machine", () => {
   const src = source("main.js");
-  assert.match(src, /kind: "dialog", width: 0\.86, height: 0\.88, props: \{ task: \{ machine: task\.machine, id: task\.id \} \}/);
+  assert.match(src, /kind: "dialog", width: 0\.88, height: 0\.9, props: \{ task: \{ machine: task\.machine, id: task\.id \} \}/);
   assert.match(src, /props: \{ create: \{ machine \} \}/);
   assert.match(src, /props: \{ settings: true, machine \}/);
 });
@@ -154,4 +154,60 @@ test("the header is ghchecker's", () => {
   assert.deepEqual([...order].sort((a, b) => a - b), order, "in the order +, refresh, filter, settings");
   assert.match(src, /gearState\(shared\("hermes-kanban\.update"\), this\.version\)/);
   assert.match(src, /h_flex\(\)\.id\("status-bar"\)\.h\(30\)/);
+});
+
+// ---- the task overlay and the new task dialog ----
+
+// R24: both overlays write to one machine, the one in their props. They never look at the focus.
+test("the overlay takes its machine from props, never from focus", () => {
+  for (const f of ["viewer.js", "create.js"]) {
+    const src = code(f);
+    assert.doesNotMatch(src, /\bfocused\(/, `${f} reads no focus`);
+    assert.doesNotMatch(src, /\bspaces\(/, `${f} reads no spaces`);
+    assert.doesNotMatch(src, /\bpanes\(/, `${f} reads no panes`);
+    assert.match(src, /this\.machine = machine;/, `${f} binds the machine of its props`);
+  }
+  const viewer = source("viewer.js");
+  // Every write goes through act() on the task (its machine) or the helper that does.
+  assert.doesNotMatch(code("viewer.js"), /api\.(patch|comment|create)\(/, "no write by machine name in the viewer");
+  assert.match(viewer, /this\.api\.act\(this\.task, "patch"/);
+  assert.match(viewer, /this\.api\.act\(this\.task, "comment"/);
+  assert.match(viewer, /commentAndUnblock\(this\.api, this\.task,/);
+  assert.match(code("create.js"), /this\.api\.create\(this\.machine,/);
+});
+
+test("main.js opens the overlay roles", () => {
+  const src = code("main.js");
+  assert.match(src, /if \(p\.task\) \{ this\.viewer = new TaskViewer\(p\.task, p\.overlay, cx\); return; \}/);
+  assert.match(src, /if \(p\.create\) \{ this\.creator = new CreateDialog\(p\.create, p\.overlay, cx\); return; \}/);
+});
+
+test("the overlays read nothing during herdr-app check", () => {
+  for (const f of ["viewer.js", "create.js"]) assert.match(code(f), /if \(checking\(\)\) return;/, f);
+});
+
+test("the overlay: no session button, no hard delete, archive in two clicks", () => {
+  const all = source("viewer.js") + source("create.js");
+  assert.doesNotMatch(all, /Open session/i);
+  assert.doesNotMatch(all, /"DELETE"/);
+  const src = source("viewer.js");
+  assert.match(src, /"Confirm archive"/);
+  assert.match(src, /status: "archived"/);
+  assert.match(src, /allowedMoves\(/);
+  assert.match(src, /outcomeText\(/);
+  assert.match(src, /mergePatched\(/);
+  assert.match(src, /setShared\("hermes-kanban\.refresh", \{ machine, at: Date\.now\(\) \}\)/);
+  assert.match(source("create.js"), /setShared\("hermes-kanban\.refresh", \{ machine, at: Date\.now\(\) \}\)/);
+});
+
+test("the overlay: Comment & unblock only while blocked, Ctrl+Enter comments", () => {
+  const src = source("viewer.js");
+  assert.match(src, /"Comment & unblock"/);
+  assert.match(src, /\.when\(blocked, /);
+  assert.match(src, /on\("submit", \(e, cx\) => \{ if \(e\.secondary\) this\.comment\(cx\); \}\)/);
+  assert.match(src, /"Ctrl\+Enter to comment"/);
+});
+
+test("single agent mode hides the agent choice in both overlays", () => {
+  for (const f of ["viewer.js", "create.js"]) assert.match(code(f), /isSingleAgent\(this\.settings, this\.machine\)/, f);
 });

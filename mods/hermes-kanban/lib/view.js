@@ -1,4 +1,6 @@
-// What the board shows: filter, group and sort tasks, and the one-line hint of a row. Pure functions.
+// What the board and the task overlay show: filter, group and sort tasks, the one-line hint of a row, and a task's
+// activity, runs and priorities. Pure functions.
+import { duration } from "./time.js";
 
 // Statuses where Hermes waits for a person.
 export const NEEDS_YOU = ["blocked", "review"];
@@ -43,3 +45,33 @@ export function hintOf(task, defaultAssignee) {
 }
 
 export const prioLabel = (n) => (n > 0 ? `P${n}` : null);
+
+// ---- the task overlay ----
+
+const RED_EVENTS = new Set(["blocked", "crashed", "timed_out", "gave_up", "spawn_failed", "failed", "reclaimed"]);
+const YELLOW_EVENTS = new Set(["claimed", "started", "running", "spawned"]);
+const sentence = (kind) => { const s = kind.replace(/_/g, " "); return s.charAt(0).toUpperCase() + s.slice(1); };
+// The reason an event carries, if it carries one.
+const reasonOf = (p) => [p?.reason, p?.summary, p?.error].find((x) => typeof x === "string" && x.trim()) ?? null;
+
+// The activity of a task (normalizeDetail): its events and comments in one list, newest first.
+export function activityOf(detail) {
+  const events = (detail.events ?? []).map((e) => {
+    const why = reasonOf(e.payload);
+    return { at: e.at, text: why ? `${sentence(e.kind)}: ${why}` : sentence(e.kind), tone: RED_EVENTS.has(e.kind) ? "red" : YELLOW_EVENTS.has(e.kind) ? "yellow" : null };
+  });
+  const comments = (detail.comments ?? []).map((c) => ({ at: c.at, text: `${c.author || "someone"} commented: ${c.body}`, tone: "blue" }));
+  return [...events, ...comments].sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
+}
+
+// One run of the overlay's list: "#7 blocked · 4m 12s"; a run still going counts to now.
+export function runLine(run, nowSeconds) {
+  const took = duration(run.startedAt, run.endedAt ?? (run.startedAt != null ? nowSeconds : null));
+  return [`#${run.id} ${run.outcome || run.status}`, took].filter(Boolean).join(" · ");
+}
+
+// The priorities to pick from: none and P1-P4 as Hermes' raw values (higher starts first), and a present value above 4.
+export function prioChoices(current) {
+  const list = [[0, "none"], [1, "P1"], [2, "P2"], [3, "P3"], [4, "P4"]];
+  return current > 4 ? [...list, [current, `P${current}`]] : list;
+}

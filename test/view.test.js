@@ -104,3 +104,37 @@ test("hintOf: a missing default assignee reads like an empty one", () => {
   const readyNoAgent = t("a", { status: "ready" });
   for (const d of [null, undefined]) assert.deepEqual(hintOf(readyNoAgent, d), { text: "no agent, will not start", tone: "orange" });
 });
+
+// ---- the task overlay ----
+import { activityOf, runLine, prioChoices } from "../mods/hermes-kanban/lib/view.js";
+
+test("activityOf: events and comments, newest first, with the reason of a block", () => {
+  const detail = {
+    events: [
+      { kind: "created", at: 100, payload: null },
+      { kind: "claimed", at: 200, payload: { lock: "w1" } },
+      { kind: "blocked", at: 400, payload: { reason: "needs input: which range?" } },
+      { kind: "spawn_failed", at: 300, payload: { error: "no binary" } },
+    ],
+    comments: [{ author: "herdr", body: "Only v2.4", at: 500 }],
+  };
+  assert.deepEqual(activityOf(detail), [
+    { at: 500, text: "herdr commented: Only v2.4", tone: "blue" },
+    { at: 400, text: "Blocked: needs input: which range?", tone: "red" },
+    { at: 300, text: "Spawn failed: no binary", tone: "red" },
+    { at: 200, text: "Claimed", tone: "yellow" },
+    { at: 100, text: "Created", tone: null },
+  ]);
+  assert.deepEqual(activityOf({ events: [], comments: [] }), []);
+});
+
+test("runLine: id, outcome and duration; a running run counts to now", () => {
+  assert.equal(runLine({ id: 7, status: "done", outcome: "blocked", startedAt: 100, endedAt: 352 }, 999), "#7 blocked · 4m 12s");
+  assert.equal(runLine({ id: 8, status: "running", outcome: null, startedAt: 100, endedAt: null }, 140), "#8 running · 0m 40s");
+  assert.equal(runLine({ id: 9, status: "queued", outcome: null, startedAt: null, endedAt: null }, 140), "#9 queued");
+});
+
+test("prioChoices: none and P1-P4 as Hermes' raw values, and a present value above 4", () => {
+  assert.deepEqual(prioChoices(2), [[0, "none"], [1, "P1"], [2, "P2"], [3, "P3"], [4, "P4"]]);
+  assert.deepEqual(prioChoices(7), [[0, "none"], [1, "P1"], [2, "P2"], [3, "P3"], [4, "P4"], [7, "P7"]]);
+});

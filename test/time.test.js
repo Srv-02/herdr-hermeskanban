@@ -11,3 +11,15 @@ test("ago", () => {
   assert.equal(ago(null, 5), "");
   assert.equal(ago(2000, 1000), "now");
 });
+
+import { duration } from "../mods/hermes-kanban/lib/time.js";
+
+test("duration: minutes and seconds, hours and minutes past an hour", () => {
+  assert.equal(duration(100, 100 + 252), "4m 12s");
+  assert.equal(duration(100, 140), "0m 40s");
+  assert.equal(duration(100, 100 + 65), "1m 05s");
+  assert.equal(duration(0, 3 * 3600 + 7 * 60 + 9), "3h 07m");
+  assert.equal(duration(null, 5), "");
+  assert.equal(duration(10, null), "");
+  assert.equal(duration(10, 5), "0m 00s");
+});

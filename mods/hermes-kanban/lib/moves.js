@@ -13,3 +13,41 @@ export function outcomeText(sent, task, labels = {}) {
   if (task.status !== sent) return `Hermes moved it to ${label}`;
   return label;
 }
+
+// Why a request failed, in Hermes' words when it gave some: its `detail` (a text, or FastAPI's list of problems),
+// else the transport error, else the HTTP code.
+export function failureOf(r) {
+  const d = r?.json?.detail;
+  if (typeof d === "string" && d) return d;
+  if (Array.isArray(d) && d.length) return d.map((x) => (typeof x === "string" ? x : x?.msg ?? JSON.stringify(x))).join("; ");
+  return r?.error || `HTTP ${r?.code ?? 0}`;
+}
+
+const ok = (r) => r?.code >= 200 && r?.code < 300;
+const message = (e) => String(e?.message ?? e);
+
+// "Comment & unblock": two requests without atomicity, both through act() and so to the task's own machine. The
+// comment goes first; a refused PATCH (409: blocked by parents not done) leaves it standing, and `error` says why.
+export async function commentAndUnblock(api, task, text) {
+  try {
+    const c = await api.act(task, "comment", { body: text });
+    if (!ok(c)) return { commented: false, moved: null, error: failureOf(c) };
+  } catch (e) {
+    return { commented: false, moved: null, error: message(e) };
+  }
+  try {
+    const p = await api.act(task, "patch", { status: "ready" });
+    if (!ok(p)) return { commented: true, moved: null, error: failureOf(p) };
+    if (!p.task) return { commented: true, moved: null, error: "the task is gone" };
+    return { commented: true, moved: p.task, error: null };
+  } catch (e) {
+    return { commented: true, moved: null, error: message(e) };
+  }
+}
+
+// The task after a PATCH: Hermes' answer, but the PATCH task dict has no comment_count and no body, so a known
+// count and body stay.
+export function mergePatched(known, patched) {
+  if (!patched) return null;
+  return { ...patched, comments: known?.comments ?? patched.comments, body: known?.body ?? null };
+}

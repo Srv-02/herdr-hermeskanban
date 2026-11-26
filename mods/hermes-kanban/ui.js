@@ -1,9 +1,10 @@
 // Shared pieces of the panel, its button and its overlays: theme colors for the states, alpha tints, icons, the
-// segmented control, the priority chip and the blankslate.
+// segmented control, buttons, the status pill, the priority chip and the blankslate.
 // Adapted from ghchecker by Michael Mayer (MIT), mods/ghchecker/ui.js; segmented control and blankslate there come
 // from herdr-github by alarboulletmarin (MIT), mods/github/ui.js at 75a2b40. Only what this mod draws so far.
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
+import { NEEDS_YOU } from "./lib/view.js";
 
 const CLEAR = "#00000000";
 // The one color not taken from the theme: the gold of an available update (the Settings button and the dialog's box).
@@ -15,6 +16,14 @@ export const GOLD = "#f0c85a";
 export function tones(t) {
   const red = t.ansi1 ?? t.blocked, green = t.ansi2 ?? t.done, yellow = t.ansi3 ?? t.working;
   return { red, green, yellow, blue: t.ansi4 ?? t.accent, magenta: t.ansi5 ?? t.accent, orange: t.ansi11 ?? yellow };
+}
+
+// A status's icon and color: blocked and review the red alert ("needs you", red also in Mono), running turns, done
+// checked, the others a dot. Mono draws everything else in the theme's muted color. `c` is tones(t).
+export function look(status, t, c, mono) {
+  if (NEEDS_YOU.includes(status)) return { icon: "alert", color: c.red };
+  const color = mono ? t.muted : ({ triage: c.orange, ready: c.blue, running: c.yellow, done: c.magenta }[status] ?? t.muted);
+  return { icon: status === "running" ? "running" : status === "done" ? "check-circle" : "circle-dot", color };
 }
 
 // A theme color with an alpha, for tinted layers. Only #rrggbb gets one.
@@ -37,6 +46,26 @@ export function segmented(id, items, value, t, onPick) {
         .on_click((_e, cx) => onPick(key, cx)).child(label);
     }));
 }
+
+// Buttons as ghchecker's: default (bordered), primary (the theme's accent), filled with a tone color (Comment &
+// unblock, Confirm archive), outlined in a tone (Archive).
+export function button(id, label, t, onClick, { primary = false, tone = null, outline = null, enabled = true, icon: name = null, small = false, tooltip = null } = {}) {
+  const fill = enabled ? (tone ?? (primary ? t.accent : null)) : null, h = small ? 26 : 30;
+  const ink = fill ? (tone ? t.background : t.accent_foreground ?? t.background) : enabled ? (outline ?? t.foreground) : t.dim;
+  return h_flex().id(id).h(h).px(label === "" ? (small ? 6 : 8) : (small ? 10 : 12)).gap(6).flex_none().items_center().justify_center().rounded(7)
+    .text_size(12).font_medium()
+    .bg(fill ?? CLEAR).border_1().border_color(fill ?? t.border)
+    .text_color(ink)
+    .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+    .when(enabled, (e) => e.cursor_pointer().hover((s) => s.bg(fill ? alpha(fill, "dd") : t.hover)).on_click(onClick))
+    .when(Boolean(tooltip), (e) => e.tooltip(tooltip))
+    .when(Boolean(name), (e) => e.child(glyph(name, 14, ink)))
+    .when(label !== "", (e) => e.child(label));
+}
+
+// A pill filled with a tint of the color: the status in the overlay's head.
+export const pill = (label, color) => h_flex().flex_none().h(24).px(10).items_center().rounded(12).bg(alpha(color, "2e"))
+  .text_size(12).font_medium().text_color(color).child(label);
 
 // The priority chip of a row: a quiet outline, as in the mockup.
 export const chip = (label, t) => h_flex().h(18).px(6).flex_none().items_center().rounded(9).border_1().border_color(t.border)
