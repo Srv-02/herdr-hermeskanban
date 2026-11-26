@@ -1,0 +1,144 @@
+{
+  "task": {
+    "id": "t_a1b2",
+    "title": "Draft release notes for example.com",
+    "body": "Collect the changes since the last tag and write short notes.",
+    "assignee": "writer",
+    "status": "blocked",
+    "priority": 2,
+    "created_by": "dashboard",
+    "created_at": 1794992800,
+    "started_at": 1794994600,
+    "completed_at": null,
+    "workspace_kind": "scratch",
+    "workspace_path": null,
+    "claim_lock": null,
+    "claim_expires": null,
+    "tenant": null,
+    "branch_name": null,
+    "project_id": null,
+    "result": null,
+    "idempotency_key": null,
+    "consecutive_failures": 0,
+    "worker_pid": null,
+    "last_failure_error": null,
+    "max_runtime_seconds": null,
+    "last_heartbeat_at": null,
+    "current_run_id": null,
+    "workflow_template_id": null,
+    "current_step_key": null,
+    "skills": null,
+    "model_override": null,
+    "provider_override": null,
+    "reasoning_effort": null,
+    "max_retries": null,
+    "goal_mode": false,
+    "goal_max_turns": null,
+    "session_id": null,
+    "block_kind": "needs_input",
+    "block_recurrences": 0,
+    "completion_contract": null,
+    "age": {
+      "created_age_seconds": 7200,
+      "started_age_seconds": 5400,
+      "time_to_complete_seconds": null
+    },
+    "latest_summary": "needs input: which version range? Both v2.3 and v2.4 have tags on main.",
+    "current_run_started_at": null,
+    "diagnostics": [
+      {
+        "kind": "stuck_in_blocked",
+        "severity": "warning",
+        "title": "Blocked for a while",
+        "detail": "Waiting for input since 2 hours.",
+        "actions": [
+          {
+            "kind": "comment",
+            "label": "Add a comment / unblock the task",
+            "payload": {},
+            "suggested": true
+          }
+        ],
+        "first_seen_at": 1794996400,
+        "last_seen_at": 1794999700,
+        "count": 1,
+        "run_id": null,
+        "data": {}
+      }
+    ],
+    "warnings": {
+      "count": 1,
+      "kinds": {
+        "stuck_in_blocked": 1
+      },
+      "latest_at": 1794999700,
+      "highest_severity": "warning"
+    }
+  },
+  "comments": [
+    {
+      "id": 5,
+      "task_id": "t_a1b2",
+      "author": "writer",
+      "body": "Which version range should the notes cover?",
+      "created_at": 1794997000
+    }
+  ],
+  "events": [
+    {
+      "id": 40,
+      "task_id": "t_a1b2",
+      "kind": "created",
+      "payload": null,
+      "created_at": 1794992800,
+      "run_id": null
+    },
+    {
+      "id": 41,
+      "task_id": "t_a1b2",
+      "kind": "claimed",
+      "payload": {
+        "lock": "worker-1"
+      },
+      "created_at": 1794994600,
+      "run_id": 7
+    },
+    {
+      "id": 44,
+      "task_id": "t_a1b2",
+      "kind": "blocked",
+      "payload": {
+        "reason": "needs input: which version range?"
+      },
+      "created_at": 1794997000,
+      "run_id": 7
+    }
+  ],
+  "attachments": [],
+  "links": {
+    "parents": [],
+    "children": []
+  },
+  "link_tasks": [],
+  "child_results": [],
+  "runs": [
+    {
+      "id": 7,
+      "task_id": "t_a1b2",
+      "profile": "writer",
+      "step_key": null,
+      "status": "blocked",
+      "claim_lock": null,
+      "claim_expires": null,
+      "worker_pid": null,
+      "max_runtime_seconds": null,
+      "last_heartbeat_at": 1794996900,
+      "started_at": 1794994600,
+      "ended_at": 1794997000,
+      "outcome": "blocked",
+      "summary": "needs input: which version range?",
+      "metadata": null,
+      "error": null
+    }
+  ]
+}

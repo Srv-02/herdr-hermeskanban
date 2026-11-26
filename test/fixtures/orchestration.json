@@ -1,0 +1,9 @@
+{
+  "orchestrator_profile": "",
+  "default_assignee": "writer",
+  "auto_decompose": true,
+  "auto_promote_children": true,
+  "resolved_orchestrator_profile": "writer",
+  "resolved_default_assignee": "writer",
+  "active_profile": "writer"
+}

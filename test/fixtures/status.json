@@ -1,0 +1,21 @@
+{
+  "version": "0.23.4",
+  "release_date": "2026.11.20",
+  "config_version": 9,
+  "latest_config_version": 9,
+  "gateway_running": true,
+  "gateway_state": "running",
+  "gateway_exit_reason": null,
+  "gateway_updated_at": 1794999995,
+  "active_agents": 1,
+  "gateway_busy": true,
+  "active_sessions": 2,
+  "auth_required": true,
+  "auth_providers": [
+    "session-token"
+  ],
+  "auth_flows": [
+    "cookie"
+  ],
+  "overall": "ok"
+}

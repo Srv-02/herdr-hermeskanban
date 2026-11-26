@@ -1,0 +1,80 @@
+{
+  "diagnostics": [
+    {
+      "task_id": "t_k1l2",
+      "task_title": "Mirror the docs to labbox.example.com",
+      "task_status": "blocked",
+      "task_assignee": "coder",
+      "diagnostics": [
+        {
+          "kind": "repeated_failures",
+          "severity": "error",
+          "title": "Task keeps failing",
+          "detail": "3 failures in a row.",
+          "actions": [
+            {
+              "kind": "reassign",
+              "label": "Reassign to different profile",
+              "payload": {
+                "reclaim_first": false
+              },
+              "suggested": true
+            }
+          ],
+          "first_seen_at": 1794998200,
+          "last_seen_at": 1794999400,
+          "count": 1,
+          "run_id": null,
+          "data": {}
+        },
+        {
+          "kind": "stuck_in_blocked",
+          "severity": "warning",
+          "title": "Blocked for a while",
+          "detail": "Waiting for input since 2 hours.",
+          "actions": [
+            {
+              "kind": "comment",
+              "label": "Add a comment / unblock the task",
+              "payload": {},
+              "suggested": true
+            }
+          ],
+          "first_seen_at": 1794998800,
+          "last_seen_at": 1794999700,
+          "count": 1,
+          "run_id": null,
+          "data": {}
+        }
+      ]
+    },
+    {
+      "task_id": "t_a1b2",
+      "task_title": "Draft release notes for example.com",
+      "task_status": "blocked",
+      "task_assignee": "writer",
+      "diagnostics": [
+        {
+          "kind": "stuck_in_blocked",
+          "severity": "warning",
+          "title": "Blocked for a while",
+          "detail": "Waiting for input since 2 hours.",
+          "actions": [
+            {
+              "kind": "comment",
+              "label": "Add a comment / unblock the task",
+              "payload": {},
+              "suggested": true
+            }
+          ],
+          "first_seen_at": 1794996400,
+          "last_seen_at": 1794999700,
+          "count": 1,
+          "run_id": null,
+          "data": {}
+        }
+      ]
+    }
+  ],
+  "count": 3
+}

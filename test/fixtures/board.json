@@ -1,0 +1,426 @@
+{
+  "columns": [
+    {
+      "name": "triage",
+      "tasks": []
+    },
+    {
+      "name": "todo",
+      "tasks": []
+    },
+    {
+      "name": "scheduled",
+      "tasks": []
+    },
+    {
+      "name": "ready",
+      "tasks": [
+        {
+          "id": "t_c3d4",
+          "title": "Sort the inbox labels",
+          "body": null,
+          "assignee": null,
+          "status": "ready",
+          "priority": 1,
+          "created_by": "dashboard",
+          "created_at": 1794992800,
+          "started_at": null,
+          "completed_at": null,
+          "workspace_kind": "scratch",
+          "workspace_path": null,
+          "claim_lock": null,
+          "claim_expires": null,
+          "tenant": null,
+          "branch_name": null,
+          "project_id": null,
+          "result": null,
+          "idempotency_key": null,
+          "consecutive_failures": 0,
+          "worker_pid": null,
+          "last_failure_error": null,
+          "max_runtime_seconds": null,
+          "last_heartbeat_at": null,
+          "current_run_id": null,
+          "workflow_template_id": null,
+          "current_step_key": null,
+          "skills": null,
+          "model_override": null,
+          "provider_override": null,
+          "reasoning_effort": null,
+          "max_retries": null,
+          "goal_mode": false,
+          "goal_max_turns": null,
+          "session_id": null,
+          "block_kind": null,
+          "block_recurrences": 0,
+          "completion_contract": null,
+          "age": {
+            "created_age_seconds": 7200,
+            "started_age_seconds": null,
+            "time_to_complete_seconds": null
+          },
+          "latest_summary": null,
+          "current_run_started_at": null,
+          "link_counts": {
+            "parents": 0,
+            "children": 0
+          },
+          "comment_count": 0,
+          "progress": null
+        },
+        {
+          "id": "t_e5f6",
+          "title": "Fix the flaky login test",
+          "body": null,
+          "assignee": "coder",
+          "status": "ready",
+          "priority": 3,
+          "created_by": "dashboard",
+          "created_at": 1794996400,
+          "started_at": null,
+          "completed_at": null,
+          "workspace_kind": "scratch",
+          "workspace_path": null,
+          "claim_lock": null,
+          "claim_expires": null,
+          "tenant": null,
+          "branch_name": null,
+          "project_id": null,
+          "result": null,
+          "idempotency_key": null,
+          "consecutive_failures": 0,
+          "worker_pid": null,
+          "last_failure_error": null,
+          "max_runtime_seconds": null,
+          "last_heartbeat_at": null,
+          "current_run_id": null,
+          "workflow_template_id": null,
+          "current_step_key": null,
+          "skills": null,
+          "model_override": null,
+          "provider_override": null,
+          "reasoning_effort": null,
+          "max_retries": null,
+          "goal_mode": false,
+          "goal_max_turns": null,
+          "session_id": null,
+          "block_kind": null,
+          "block_recurrences": 0,
+          "completion_contract": null,
+          "age": {
+            "created_age_seconds": 3600,
+            "started_age_seconds": null,
+            "time_to_complete_seconds": null
+          },
+          "latest_summary": null,
+          "current_run_started_at": null,
+          "link_counts": {
+            "parents": 0,
+            "children": 0
+          },
+          "comment_count": 0,
+          "progress": null
+        }
+      ]
+    },
+    {
+      "name": "running",
+      "tasks": [
+        {
+          "id": "t_g7h8",
+          "title": "Compare three static site generators",
+          "body": null,
+          "assignee": "research",
+          "status": "running",
+          "priority": 1,
+          "created_by": "dashboard",
+          "created_at": 1794992800,
+          "started_at": 1794999100,
+          "completed_at": null,
+          "workspace_kind": "scratch",
+          "workspace_path": null,
+          "claim_lock": null,
+          "claim_expires": null,
+          "tenant": null,
+          "branch_name": null,
+          "project_id": null,
+          "result": null,
+          "idempotency_key": null,
+          "consecutive_failures": 0,
+          "worker_pid": null,
+          "last_failure_error": null,
+          "max_runtime_seconds": null,
+          "last_heartbeat_at": null,
+          "current_run_id": 12,
+          "workflow_template_id": null,
+          "current_step_key": null,
+          "skills": null,
+          "model_override": null,
+          "provider_override": null,
+          "reasoning_effort": null,
+          "max_retries": null,
+          "goal_mode": false,
+          "goal_max_turns": null,
+          "session_id": null,
+          "block_kind": null,
+          "block_recurrences": 0,
+          "completion_contract": null,
+          "age": {
+            "created_age_seconds": 7200,
+            "started_age_seconds": 900,
+            "time_to_complete_seconds": null
+          },
+          "latest_summary": null,
+          "current_run_started_at": 1794999100,
+          "link_counts": {
+            "parents": 0,
+            "children": 0
+          },
+          "comment_count": 0,
+          "progress": null
+        }
+      ]
+    },
+    {
+      "name": "blocked",
+      "tasks": [
+        {
+          "id": "t_a1b2",
+          "title": "Draft release notes for example.com",
+          "body": "Collect the changes since the last tag and write short notes.",
+          "assignee": "writer",
+          "status": "blocked",
+          "priority": 2,
+          "created_by": "dashboard",
+          "created_at": 1794992800,
+          "started_at": 1794994600,
+          "completed_at": null,
+          "workspace_kind": "scratch",
+          "workspace_path": null,
+          "claim_lock": null,
+          "claim_expires": null,
+          "tenant": null,
+          "branch_name": null,
+          "project_id": null,
+          "result": null,
+          "idempotency_key": null,
+          "consecutive_failures": 0,
+          "worker_pid": null,
+          "last_failure_error": null,
+          "max_runtime_seconds": null,
+          "last_heartbeat_at": null,
+          "current_run_id": null,
+          "workflow_template_id": null,
+          "current_step_key": null,
+          "skills": null,
+          "model_override": null,
+          "provider_override": null,
+          "reasoning_effort": null,
+          "max_retries": null,
+          "goal_mode": false,
+          "goal_max_turns": null,
+          "session_id": null,
+          "block_kind": "needs_input",
+          "block_recurrences": 0,
+          "completion_contract": null,
+          "age": {
+            "created_age_seconds": 7200,
+            "started_age_seconds": 5400,
+            "time_to_complete_seconds": null
+          },
+          "latest_summary": "needs input: which version range?",
+          "current_run_started_at": null,
+          "link_counts": {
+            "parents": 0,
+            "children": 0
+          },
+          "comment_count": 1,
+          "progress": null,
+          "diagnostics": [
+            {
+              "kind": "stuck_in_blocked",
+              "severity": "warning",
+              "title": "Blocked for a while",
+              "detail": "Waiting for input since 2 hours.",
+              "actions": [
+                {
+                  "kind": "comment",
+                  "label": "Add a comment / unblock the task",
+                  "payload": {},
+                  "suggested": true
+                }
+              ],
+              "first_seen_at": 1794996400,
+              "last_seen_at": 1794999700,
+              "count": 1,
+              "run_id": null,
+              "data": {}
+            }
+          ],
+          "warnings": {
+            "count": 1,
+            "kinds": {
+              "stuck_in_blocked": 1
+            },
+            "latest_at": 1794999700,
+            "highest_severity": "warning"
+          }
+        },
+        {
+          "id": "t_k1l2",
+          "title": "Mirror the docs to labbox.example.com",
+          "body": null,
+          "assignee": "coder",
+          "status": "blocked",
+          "priority": 2,
+          "created_by": "dashboard",
+          "created_at": 1794992800,
+          "started_at": null,
+          "completed_at": null,
+          "workspace_kind": "scratch",
+          "workspace_path": null,
+          "claim_lock": null,
+          "claim_expires": null,
+          "tenant": null,
+          "branch_name": null,
+          "project_id": null,
+          "result": null,
+          "idempotency_key": null,
+          "consecutive_failures": 3,
+          "worker_pid": null,
+          "last_failure_error": "spawn failed: workspace not writable",
+          "max_runtime_seconds": null,
+          "last_heartbeat_at": null,
+          "current_run_id": null,
+          "workflow_template_id": null,
+          "current_step_key": null,
+          "skills": null,
+          "model_override": null,
+          "provider_override": null,
+          "reasoning_effort": null,
+          "max_retries": null,
+          "goal_mode": false,
+          "goal_max_turns": null,
+          "session_id": null,
+          "block_kind": null,
+          "block_recurrences": 0,
+          "completion_contract": null,
+          "age": {
+            "created_age_seconds": 7200,
+            "started_age_seconds": null,
+            "time_to_complete_seconds": null
+          },
+          "latest_summary": null,
+          "current_run_started_at": null,
+          "link_counts": {
+            "parents": 0,
+            "children": 0
+          },
+          "comment_count": 0,
+          "progress": null,
+          "diagnostics": [
+            {
+              "kind": "repeated_failures",
+              "severity": "error",
+              "title": "Task keeps failing",
+              "detail": "3 failures in a row.",
+              "actions": [
+                {
+                  "kind": "reassign",
+                  "label": "Reassign to different profile",
+                  "payload": {
+                    "reclaim_first": false
+                  },
+                  "suggested": true
+                }
+              ],
+              "first_seen_at": 1794998200,
+              "last_seen_at": 1794999400,
+              "count": 1,
+              "run_id": null,
+              "data": {}
+            }
+          ],
+          "warnings": {
+            "count": 1,
+            "kinds": {
+              "repeated_failures": 1
+            },
+            "latest_at": 1794999400,
+            "highest_severity": "error"
+          }
+        }
+      ]
+    },
+    {
+      "name": "review",
+      "tasks": []
+    },
+    {
+      "name": "done",
+      "tasks": [
+        {
+          "id": "t_i9j0",
+          "title": "Rename the staging bucket",
+          "body": null,
+          "assignee": "coder",
+          "status": "done",
+          "priority": 0,
+          "created_by": "dashboard",
+          "created_at": 1794992800,
+          "started_at": 1794998500,
+          "completed_at": 1794999400,
+          "workspace_kind": "scratch",
+          "workspace_path": null,
+          "claim_lock": null,
+          "claim_expires": null,
+          "tenant": null,
+          "branch_name": null,
+          "project_id": null,
+          "result": "ok",
+          "idempotency_key": null,
+          "consecutive_failures": 0,
+          "worker_pid": null,
+          "last_failure_error": null,
+          "max_runtime_seconds": null,
+          "last_heartbeat_at": null,
+          "current_run_id": null,
+          "workflow_template_id": null,
+          "current_step_key": null,
+          "skills": null,
+          "model_override": null,
+          "provider_override": null,
+          "reasoning_effort": null,
+          "max_retries": null,
+          "goal_mode": false,
+          "goal_max_turns": null,
+          "session_id": null,
+          "block_kind": null,
+          "block_recurrences": 0,
+          "completion_contract": null,
+          "age": {
+            "created_age_seconds": 7200,
+            "started_age_seconds": 1500,
+            "time_to_complete_seconds": null
+          },
+          "latest_summary": "Renamed and updated the two references.",
+          "current_run_started_at": null,
+          "link_counts": {
+            "parents": 0,
+            "children": 0
+          },
+          "comment_count": 0,
+          "progress": null
+        }
+      ]
+    }
+  ],
+  "tenants": [],
+  "assignees": [
+    "coder",
+    "research",
+    "writer"
+  ],
+  "latest_event_id": 87,
+  "now": 1795000000
+}
