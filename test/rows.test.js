@@ -212,13 +212,13 @@ test("single agent mode hides the agent choice in both overlays", () => {
   for (const f of ["viewer.js", "create.js"]) assert.match(code(f), /isSingleAgent\(this\.settings, this\.machine\)/, f);
 });
 
-// Untrusted task text: the description goes through safeMarkdown, raw HTML off, links only through safeLink.
-test("the overlay draws the description safely", () => {
+// Untrusted task text: never Markdown. The description is plain text (plainHtml escapes everything, links only bare
+// https URLs), and a link opens only through safeLink.
+test("the overlay draws the description as plain text", () => {
+  const all = fs.readdirSync(dir, { recursive: true }).filter((f) => f.endsWith(".js")).map((f) => source(f)).join("\n");
+  assert.doesNotMatch(all, /TextView\.markdown\(/, "no Markdown view of Hermes content");
   const src = source("viewer.js");
-  assert.match(src, /TextView\.markdown\([^)]*, safeMarkdown\(body\)\)/);
-  assert.match(src, /\.raw_html\(false\)/);
-  assert.match(src, /\.on_link_click\(\(url\) => openUrl\(safeLink\(url\)\)\)/);
-  assert.equal([...src.matchAll(/TextView\.(markdown|html)\(/g)].length, 1, "one Markdown view, no HTML view");
-  assert.doesNotMatch(source("create.js"), /TextView/);
+  assert.match(src, /TextView\.html\(`body-\$\{this\.id\}`, plainHtml\(body\)\)\.selectable\(true\)\.on_link_click\(\(url\) => openUrl\(safeLink\(url\)\)\)/);
+  assert.equal([...all.matchAll(/TextView\.html\(/g)].length, 1, "one text view, fed by plainHtml");
   assert.match(source("ui.js"), /export function openUrl\(url\) \{\s*if \(!safeLink\(url\)\) return;/);
 });

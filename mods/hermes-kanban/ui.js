@@ -6,7 +6,7 @@ import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { exec } from "herdr";
 import { NEEDS_YOU } from "./lib/view.js";
-import { safeLink } from "./lib/markdown.js";
+import { safeLink } from "./lib/text.js";
 
 const CLEAR = "#00000000";
 // The one color not taken from the theme: the gold of an available update (the Settings button and the dialog's box).
@@ -28,7 +28,7 @@ export function look(status, t, c, mono) {
   return { icon: status === "running" ? "running" : status === "done" ? "check-circle" : "circle-dot", color };
 }
 
-// Opens a link in the browser of this computer, only an https one (lib/markdown.js safeLink) and only on a click.
+// Opens a link in the browser of this computer, only an https one (lib/text.js safeLink) and only on a click.
 // From ghchecker (MIT), mods/ghchecker/ui.js openUrl.
 export function openUrl(url) {
   if (!safeLink(url)) return;

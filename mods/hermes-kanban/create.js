@@ -24,7 +24,7 @@ export class CreateDialog {
     this.title = InputState.new({ placeholder: "What should be done?" });
     this.title.on("change", (_e, cx) => { const any = Boolean(this.title.value().trim()); if (any !== this.typed) { this.typed = any; cx.notify(); } });
     this.title.on("submit", (_e, cx) => this.create(cx));
-    this.body = TextareaState.new({ placeholder: "Description (Markdown, optional)" });
+    this.body = TextareaState.new({ placeholder: "Description (optional)" });
     this.body.set_auto_grow(5, 14);
     this.body.on("submit", (e, cx) => { if (e.secondary) this.create(cx); });
     if (checking()) return;

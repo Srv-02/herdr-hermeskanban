@@ -10,7 +10,7 @@ import { div } from "gpui-kit";
 import { v_flex, h_flex, TextView, TextareaState, Textarea } from "gpui-base";
 import { theme, closeOverlay, shared, setShared, exec, checking, readTextFile, appHome } from "herdr";
 import { tones, alpha, glyph, glyphOf, segmented, button, pill, look, openUrl } from "./ui.js";
-import { safeMarkdown, safeLink } from "./lib/markdown.js";
+import { plainHtml, safeLink } from "./lib/text.js";
 import { createApi } from "./lib/api.js";
 import { normalizeDetail } from "./lib/board.js";
 import { allowedMoves, outcomeText, commentAndUnblock, mergePatched, failureOf } from "./lib/moves.js";
@@ -34,7 +34,7 @@ export class TaskViewer {
     this.detail = null; this.error = null; this.note = null; this.busy = null; this.archiving = false; this.settings = null;
     // The row of the board, drawn until the full task is in.
     this.task = (this.snap()?.board?.tasks ?? []).find((t) => t.id === id) ?? null;
-    this.box = TextareaState.new({ placeholder: "Leave a comment (Markdown)" });
+    this.box = TextareaState.new({ placeholder: "Leave a comment" });
     this.box.set_auto_grow(3, 10);
     this.box.on("change", (_e, cx) => { const any = Boolean(this.box.value().trim()); if (any !== this.typed) { this.typed = any; cx.notify(); } });
     this.box.on("submit", (e, cx) => { if (e.secondary) this.comment(cx); });
@@ -201,14 +201,14 @@ export class TaskViewer {
         .child(`Answer as a comment, then unblock.${task.assignee ? " The agent continues with the next dispatch." : ""}`));
   }
 
-  // The body is untrusted (anyone who reaches the instance can write a task): safeMarkdown drops images and raw
-  // HTML, raw_html(false) keeps any rest literal, and a click opens only an https link.
+  // The body is untrusted (anyone who reaches the instance can write a task): drawn as plain text, never as Markdown.
+  // plainHtml escapes every character and links only bare https URLs; a click opens only an https link.
   description(task, t) {
     const body = task?.body?.trim();
     return v_flex().flex_none().rounded(9).border_1().border_color(t.border).overflow_hidden()
       .child(h_flex().h(36).px(12).items_center().bg(t.raised).text_size(12).text_color(t.muted).child("Description"))
       .child(div().px(14).py(12).child(!this.detail ? div().text_color(t.muted).child("Loading…")
-        : body ? TextView.markdown(`body-${this.id}`, safeMarkdown(body)).raw_html(false).selectable(true).on_link_click((url) => openUrl(safeLink(url))) : div().italic().text_color(t.muted).child("No description.")));
+        : body ? TextView.html(`body-${this.id}`, plainHtml(body)).selectable(true).on_link_click((url) => openUrl(safeLink(url))) : div().italic().text_color(t.muted).child("No description.")));
   }
 
   activity(t, c) {
