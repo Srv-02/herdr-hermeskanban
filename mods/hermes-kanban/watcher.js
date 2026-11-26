@@ -10,7 +10,7 @@
 import { spaces, panes, focused, exec, notify, playSound, setBadge, shared, setShared, readTextFile, appHome } from "herdr";
 import { createApi } from "./lib/api.js";
 import { createPoller } from "./lib/poller.js";
-import { loadSettings } from "./lib/settings.js";
+import { loadSettings, isSingleAgent } from "./lib/settings.js";
 import { visibleMachines, focusedInstance, jumpTarget, rememberPane } from "./lib/instances.js";
 import { toastOf, alertsOf, countUnseen, badgeOf } from "./lib/changes.js";
 
@@ -65,7 +65,7 @@ async function once(w) {
   const { toasts, sound } = alertsOf(changes, w.settings);
   for (const c of toasts) {
     const target = jumpTarget(c.machine, view, lastPanes);
-    notify({ ...toastOf(c), timeout: 8000, ...(target ? { action: { name: "pane.focus", args: target } } : {}) });
+    notify({ ...toastOf(c, { single: isSingleAgent(w.settings, c.machine) }), timeout: 8000, ...(target ? { action: { name: "pane.focus", args: target } } : {}) });
   }
   if (sound) playSound(sound);
 

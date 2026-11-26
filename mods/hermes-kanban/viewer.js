@@ -175,7 +175,8 @@ export class TaskViewer {
   // ---- the top ----
   top(task, t, c) {
     const mono = this.settings?.["status.color"] === "mono";
-    const meta = task ? [task.assignee ?? "unassigned", task.createdAt != null ? `created ${since(task.createdAt)}` : null,
+    const single = !this.settings || isSingleAgent(this.settings, this.machine);
+    const meta = task ? [single ? null : task.assignee ?? "unassigned", task.createdAt != null ? `created ${since(task.createdAt)}` : null,
       `${task.comments} ${task.comments === 1 ? "comment" : "comments"}`].filter(Boolean).join(" · ") : "";
     return v_flex().flex_none().gap(10).px(20).pt(18).pb(14).border_b(1).border_color(t.border)
       .child(h_flex().gap(10).items_center()
@@ -193,9 +194,10 @@ export class TaskViewer {
 
   // ---- the left column ----
   blockedBox(task, t, c) {
+    const single = !this.settings || isSingleAgent(this.settings, this.machine);
     const reason = blockReason(this.detail, task) ?? "Hermes gave no reason.";
     return v_flex().flex_none().gap(6).px(14).py(12).rounded(9).border_1().border_color(alpha(c.red, "73")).bg(alpha(c.red, "14"))
-      .child(div().font_semibold().text_color(c.red).child(task.assignee ? `${task.assignee} is blocked` : "Blocked"))
+      .child(div().font_semibold().text_color(c.red).child(!single && task.assignee ? `${task.assignee} is blocked` : "Blocked"))
       .child(div().text_color(t.foreground).child(reason))
       .child(div().text_size(11).text_color(t.muted)
         .child(`Answer as a comment, then unblock.${task.assignee ? " The agent continues with the next dispatch." : ""}`));
@@ -217,7 +219,10 @@ export class TaskViewer {
   }
 
   activity(t, c) {
-    const items = this.detail ? activityOf(this.detail) : [];
+    // Single agent mode: an agent's comment is the instance's (no agent names).
+    const single = !this.settings || isSingleAgent(this.settings, this.machine), snap = this.snap();
+    const agents = single ? [...(snap?.board?.assignees ?? []), snap?.resolvedAssignee, this.task?.assignee].filter(Boolean) : null;
+    const items = this.detail ? activityOf(this.detail, { agents, instance: this.machine }) : [];
     const list = v_flex().flex_none();
     if (!this.detail) return list.child(div().py(6).text_size(12).text_color(t.muted).child("Loading…"));
     if (!items.length) return list.child(div().py(6).text_size(12).text_color(t.muted).child("No activity yet."));

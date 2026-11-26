@@ -170,3 +170,15 @@ test("prioChoices: none and P1-P4 as Hermes' raw values, and a present value abo
   assert.deepEqual(prioChoices(2), [[0, "none"], [1, "P1"], [2, "P2"], [3, "P3"], [4, "P4"]]);
   assert.deepEqual(prioChoices(7), [[0, "none"], [1, "P1"], [2, "P2"], [3, "P3"], [4, "P4"], [7, "P7"]]);
 });
+
+test("hintOf in single agent mode names no agent", () => {
+  const ready = t("a", { status: "ready" });
+  assert.deepEqual(hintOf(ready, "coder", { single: true }), { text: "starts with next dispatch", tone: "blue" });
+  assert.deepEqual(hintOf(ready, "", { single: true }), { text: "no agent, will not start", tone: "orange" });
+});
+
+test("activityOf in single agent mode names the instance for an agent's comment", () => {
+  const detail = { events: [], comments: [{ at: 2, author: "default", body: "done it" }, { at: 1, author: "herdr", body: "go" }] };
+  const texts = activityOf(detail, { agents: ["default"], instance: "devbox" }).map((x) => x.text);
+  assert.deepEqual(texts, ["devbox commented: done it", "herdr commented: go"]);
+});

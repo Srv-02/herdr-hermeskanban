@@ -140,3 +140,12 @@ test("badgeOf: the number of unseen needs-you events, else nothing", () => {
   assert.equal(badgeOf({ devbox: { needs: 0, done: 4 } }), null);
   assert.equal(badgeOf({}), null);
 });
+
+// Single agent mode: no agent names; the instance is the subject.
+test("toastOf in single agent mode names the instance, never the agent", () => {
+  const c = (kind, o = {}) => ({ machine: "devbox", agent: "default", kind, title: "Draft notes", failure: null, ...o });
+  assert.deepEqual(toastOf(c("needs_you"), { single: true }), { title: "devbox needs you", body: "Draft notes", level: "warning" });
+  assert.equal(toastOf(c("done"), { single: true }).title, "devbox: task finished");
+  assert.equal(toastOf(c("failed", { failure: "oom" }), { single: true }).title, "devbox: task failed");
+  for (const k of ["needs_you", "done", "failed"]) assert.doesNotMatch(JSON.stringify(toastOf(c(k), { single: true })), /default/);
+});

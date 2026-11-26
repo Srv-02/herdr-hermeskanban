@@ -41,10 +41,13 @@ const TOAST = {
   failed: { verb: "failed", level: "error" },
 };
 
-export function toastOf(change) {
+// In single agent mode the instance is the subject and no agent is named: "devbox needs you", "devbox: task finished".
+const SINGLE = { needs_you: (m) => `${m} needs you`, done: (m) => `${m}: task finished`, failed: (m) => `${m}: task failed` };
+export function toastOf(change, { single = false } = {}) {
   const { verb, level } = TOAST[change.kind];
   const body = change.kind === "failed" && change.failure ? `${change.title}: ${change.failure}` : change.title;
-  return { title: `${change.machine}: ${change.agent || "a task"} ${verb}`, body, level };
+  const title = single ? SINGLE[change.kind](change.machine) : `${change.machine}: ${change.agent || "a task"} ${verb}`;
+  return { title, body, level };
 }
 
 // The dot over all visible instances, from what is new and not seen yet (countUnseen): red for a needs-you event

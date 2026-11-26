@@ -356,3 +356,16 @@ test("the filter bar: a wide search, the agent menu beside priority and grouping
   const second = bar.slice(bar.lastIndexOf(".child(h_flex().gap("));
   for (const id of ["prio", "agent", "group"]) assert.match(second, new RegExp(`"${id}"`), id);
 });
+
+// Single agent mode hides agent names for that instance: row meta, grouping by agent, the overlay's top and blocked box,
+// the toasts.
+test("single agent mode shows no agent names", () => {
+  const main = source("main.js"), viewer = source("viewer.js"), watcher = source("watcher.js");
+  assert.match(main, /x\.single \? null : task\.assignee/, "row meta without the agent");
+  assert.match(main, /hintOf\(task, x\.defaultAssignee, \{ single: x\.single \}\)/);
+  assert.match(main, /single && this\.f\.group === "agent" \? "status" : this\.f\.group/, "no grouping by agent");
+  assert.match(viewer, /single \? null : task\.assignee \?\? "unassigned"/, "overlay top without the agent");
+  assert.match(viewer, /!single && task\.assignee \? `\$\{task\.assignee\} is blocked` : "Blocked"/);
+  assert.match(viewer, /activityOf\(this\.detail, \{ agents, instance: this\.machine \}\)/);
+  assert.match(watcher, /toastOf\(c, \{ single: isSingleAgent\(w\.settings, c\.machine\) \}\)/);
+});

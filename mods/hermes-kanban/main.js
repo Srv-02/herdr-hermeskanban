@@ -289,7 +289,7 @@ export default class HermesKanban extends View {
 
   // The filter bar, shown with the filter button, in two rows: state and the search over the rest of the width (as
   // ghchecker's field), then priority, agent (a menu: an instance can have any number of profiles; not in single agent
-  // mode) and grouping.
+  // mode) and grouping (by agent not in single agent mode).
   filterBar(t, agents, agent, single) {
     const label = (text) => div().flex_none().mr(6).text_size(11).text_color(t.muted).child(text);
     const pick = (patch) => (_k, cx) => { this.setFilter(patch(_k)); cx.notify(); };
@@ -308,7 +308,7 @@ export default class HermesKanban extends View {
             () => this.openMenu("agent", [["all", "All"], ...agents.map((a) => [a, a]), ["none", "none"]], agent))))
         .child(div().flex_1())
         .child(label("Group"))
-        .child(segmented("group", [["status", "Status"], ["agent", "Agent"], ["none", "None"]], this.f.group, t, pick((k) => ({ group: k })))));
+        .child(segmented("group", [["status", "Status"], ...(single ? [] : [["agent", "Agent"]]), ["none", "None"]], single && this.f.group === "agent" ? "status" : this.f.group, t, pick((k) => ({ group: k })))));
   }
 
   // ---- drawing: the list ----
@@ -319,9 +319,9 @@ export default class HermesKanban extends View {
     return h_flex().id(key).h(size).w_full().flex_none().px(8).gap(9).items_center().rounded(7).cursor_pointer().overflow_hidden().hover((s) => s.bg(t.hover));
   }
   taskRow(task, key, size, x) {
-    const { t, c, mono } = x, s = look(task.status, t, c, mono), hint = hintOf(task, x.defaultAssignee), prio = prioLabel(task.priority);
+    const { t, c, mono } = x, s = look(task.status, t, c, mono), hint = hintOf(task, x.defaultAssignee, { single: x.single }), prio = prioLabel(task.priority);
     const age = ago(task.status === "done" ? task.completedAt ?? task.createdAt : task.createdAt, Date.now() / 1000);
-    const meta = [task.id, task.assignee ?? "—", age].filter(Boolean).join(" · ");
+    const meta = [task.id, x.single ? null : task.assignee ?? "—", age].filter(Boolean).join(" · ");
     const tint = hint && (hint.tone === "red" ? c.red : mono ? t.muted : c[hint.tone] ?? t.muted);
     return this.row(key, size, t).child(glyphOf(s.icon, 15, s.color))
       .child(v_flex().flex_1().min_w(0).gap(3)
@@ -335,7 +335,7 @@ export default class HermesKanban extends View {
   }
   // A group's heading: its status color (grouped by status), name and count, and the red alert when it needs you.
   heading(g, size, x) {
-    const { t, c, mono } = x, status = this.f.group === "status";
+    const { t, c, mono } = x, status = x.group === "status";
     return h_flex().h(size).w_full().flex_none().px(8).pt(8).gap(7).items_center().text_size(12)
       .when(status, (e) => e.child(div().size(7).flex_none().rounded(4).bg(look(g.key, t, c, mono).color)))
       .child(div().min_w(0).truncate().font_semibold().child(g.label))
@@ -353,7 +353,9 @@ export default class HermesKanban extends View {
     ]);
   }
 
-  list(t, c, snap, agent, machine) {
+  list(t, c, snap, agent, machine, single) {
+    // Single agent mode never groups by agent: the names stay hidden.
+    const group = single && this.f.group === "agent" ? "status" : this.f.group;
     const tasks = filterTasks(snap.board.tasks, { state: this.f.state, query: this.query, agent, prio: this.f.prio });
     const box = v_flex().flex_1().min_h(0).relative().px(6).py(4);
     if (!tasks.length) {
@@ -362,8 +364,8 @@ export default class HermesKanban extends View {
       const text = narrowed ? "No tasks match" : { open: "No open tasks", done: "No done tasks" }[this.f.state] ?? "No tasks";
       return box.child(div().px(16).py(28).text_size(12).text_center().text_color(t.dim).child(text));
     }
-    const groups = groupTasks(tasks, this.f.group, snap.workflow?.order ?? ORDER, snap.workflow?.labels ?? {});
-    const items = this.entries = this.entriesOf(groups, { t, c, mono: this.settings["status.color"] === "mono", defaultAssignee: snap.defaultAssignee });
+    const groups = groupTasks(tasks, group, snap.workflow?.order ?? ORDER, snap.workflow?.labels ?? {});
+    const items = this.entries = this.entriesOf(groups, { t, c, mono: this.settings["status.color"] === "mono", defaultAssignee: snap.defaultAssignee, single, group });
     const byKey = new Map(items.map((x) => [x.key, x]));
     const id = `list-${machine}`;
     return box
@@ -482,7 +484,7 @@ export default class HermesKanban extends View {
     const agent = single || !(this.f.agent === "none" || agents.includes(this.f.agent)) ? "all" : this.f.agent;
     return shell
       .when(this.filtering, (e) => e.child(this.filterBar(t, agents, agent, single)))
-      .child(this.list(t, c, snap, agent, focus.machine))
+      .child(this.list(t, c, snap, agent, focus.machine, single))
       .child(this.statusBar(t, c, snap));
   }
 }

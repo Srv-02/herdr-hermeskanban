@@ -36,12 +36,13 @@ export function groupTasks(tasks, by, order, labels = {}) {
   return keys.map((k) => make(k, labels[k] ?? k, sorted.filter((t) => t.status === k)));
 }
 
-export function hintOf(task, defaultAssignee) {
+// In single agent mode no agent is named: a task that goes to the default agent just starts.
+export function hintOf(task, defaultAssignee, { single = false } = {}) {
   if (task.status === "blocked") return { text: task.summary || task.failure || "blocked", tone: "red" };
   if (task.status !== "ready") return null;
   if (task.assignee) return { text: "starts with next dispatch", tone: "blue" };
   if (!defaultAssignee) return { text: "no agent, will not start", tone: "orange" };
-  return { text: `goes to ${defaultAssignee}`, tone: "blue" };
+  return single ? { text: "starts with next dispatch", tone: "blue" } : { text: `goes to ${defaultAssignee}`, tone: "blue" };
 }
 
 export const prioLabel = (n) => (n > 0 ? `P${n}` : null);
@@ -57,15 +58,17 @@ const sentence = (kind) => { const s = kind.replace(/_/g, " "); return s.charAt(
 const reasonOf = (p) => [p?.reason, p?.summary, p?.error].find((x) => typeof x === "string" && x.trim()) ?? null;
 
 // The activity of a task (normalizeDetail): its events and comments in one list, newest first. Heartbeats stay out;
-// a "commented" event only when the comments themselves are not listed (else it would show twice).
-export function activityOf(detail) {
+// a "commented" event only when the comments themselves are not listed (else it would show twice). In single agent mode
+// (`agents`: the instance's agent names) a comment of an agent is the instance's.
+export function activityOf(detail, { agents = null, instance = null } = {}) {
   const comments = detail.comments ?? [];
   const events = (detail.events ?? []).filter((e) => e.kind !== "heartbeat" && !(e.kind === "commented" && comments.length)).map((e) => {
     if (e.kind === "status" && typeof e.payload?.status === "string") return { at: e.at, text: `Status: ${e.payload.status}`, tone: null };
     const why = reasonOf(e.payload);
     return { at: e.at, text: why ? `${sentence(e.kind)}: ${why}` : sentence(e.kind), tone: RED_EVENTS.has(e.kind) ? "red" : YELLOW_EVENTS.has(e.kind) ? "yellow" : null };
   });
-  const said = comments.map((c) => ({ at: c.at, text: `${c.author || "someone"} commented: ${c.body}`, tone: "blue" }));
+  const who = (a) => (agents && instance && agents.includes(a) ? instance : a || "someone");
+  const said = comments.map((c) => ({ at: c.at, text: `${who(c.author)} commented: ${c.body}`, tone: "blue" }));
   return [...events, ...said].sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
 }
 
