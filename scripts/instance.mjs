@@ -17,6 +17,7 @@ if (!COMMANDS.includes(command) || !machine) {
 function run({ cmd, args, opts }) {
   const seconds = String(Math.min(600, Math.ceil((opts.timeout ?? 30000) / 1000)));
   const r = spawnSync("hc", ["exec", "--json", "--on", opts.on, "--timeout", seconds, "--", cmd, ...args], { encoding: "utf8", maxBuffer: 16 << 20 });
+  if (r.error) throw new Error(`could not run hc: ${r.error.code === "ENOENT" ? "hc is not installed or not on PATH" : r.error.message}`);
   if (r.status !== 0) throw new Error(`hc exec failed (${r.status}): ${redactSecrets(r.stderr.trim())}`);
   const j = JSON.parse(r.stdout);
   const text = (b) => Buffer.from(b ?? "", "base64").toString("utf8");

@@ -1,7 +1,7 @@
 // Loaded before every test file (package.json: node --import ./test/no-network.js --test). No test may reach the
 // network: the real fetch is replaced by one that rejects, and a test during which it was called fails afterwards,
-// also when the code under test swallowed the rejection (main.js runs its update pass in a try/catch). A test that
-// needs an answer from GitHub passes its own fake fetch or sets globalThis.fetch for its duration.
+// also when the code under test swallowed the rejection (it may run in a try/catch). A test that
+// needs an answer from the network passes its own fake fetch or sets globalThis.fetch for its duration.
 import { afterEach } from "node:test";
 
 const calls = [];

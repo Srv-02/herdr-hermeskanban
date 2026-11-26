@@ -47,7 +47,7 @@ test("requestSpec binds to the given machine and keeps the token out of argv", (
   assert.equal(s.opts.timeout, 20000);
   assert.deepEqual(s.args, ["-c", REQUEST_SCRIPT, "sh", "gated", "GET", BASE + KANBAN + "/stats?board=default"]);
   assert.ok(!s.args.some((a) => /Bearer|dashboard\.token/.test(a) && a !== REQUEST_SCRIPT));
-  assert.doesNotMatch(REQUEST_SCRIPT, /\$\(\s*cat|`cat/); // keine Kommandosubstitution des Schlüssels
+  assert.doesNotMatch(REQUEST_SCRIPT, /\$\(\s*cat|`cat/); // no command substitution of the key
 });
 
 test("requestSpec stringifies the body into argument 6", () => {

@@ -28,7 +28,7 @@ for (const f of js) {
   if (r.status !== 0) problems.push(`${rel(f)}: does not parse\n${r.stderr}`);
 }
 for (const f of shells) {
-  const r = spawnSync(/shoot\.sh$/.test(f) ? "bash" : "sh", ["-n", f], { encoding: "utf8" });
+  const r = spawnSync("sh", ["-n", f], { encoding: "utf8" });
   if (r.status !== 0) problems.push(`${rel(f)}: does not parse\n${r.stderr}`);
 }
 
