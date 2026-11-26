@@ -70,7 +70,7 @@ test("toastOf names the instance", () => {
 
 test("toastOf: levels, bodies and a missing agent", () => {
   assert.deepEqual(toastOf({ machine: "devbox", agent: "writer", kind: "done", title: "Draft notes" }), { title: "devbox: writer finished", body: "Draft notes", level: "success" });
-  assert.deepEqual(toastOf({ machine: "labbox", agent: null, kind: "needs_you", title: "X" }), { title: "labbox: a task needs input", body: "X", level: "warning" });
+  assert.deepEqual(toastOf({ machine: "labbox", agent: null, kind: "needs_you", title: "X" }), { title: "labbox: a task needs input", body: "X", level: "error" });
   assert.deepEqual(toastOf({ machine: "devbox", agent: "writer", kind: "failed", title: "Draft notes", failure: "crashed: oom" }),
     { title: "devbox: writer failed", body: "Draft notes: crashed: oom", level: "error" });
   assert.equal(toastOf({ machine: "devbox", agent: "writer", kind: "failed", title: "Draft notes", failure: null }).body, "Draft notes");
@@ -145,7 +145,7 @@ test("badgeOf: one marker without a number while a needs-you event is unseen, el
 // Single agent mode: no agent names; the instance is the subject.
 test("toastOf in single agent mode names the instance, never the agent", () => {
   const c = (kind, o = {}) => ({ machine: "devbox", agent: "default", kind, title: "Draft notes", failure: null, ...o });
-  assert.deepEqual(toastOf(c("needs_you"), { single: true }), { title: "devbox needs you", body: "Draft notes", level: "warning" });
+  assert.deepEqual(toastOf(c("needs_you"), { single: true }), { title: "devbox needs you", body: "Draft notes", level: "error" });
   assert.equal(toastOf(c("done"), { single: true }).title, "devbox: task finished");
   assert.equal(toastOf(c("failed", { failure: "oom" }), { single: true }).title, "devbox: task failed");
   for (const k of ["needs_you", "done", "failed"]) assert.doesNotMatch(JSON.stringify(toastOf(c(k), { single: true })), /default/);

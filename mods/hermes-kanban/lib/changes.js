@@ -35,8 +35,9 @@ export function diffBoards(prev, next) {
   return out;
 }
 
+// Red for whatever needs you or failed, as the dot and the strip; green for done. No yellow.
 const TOAST = {
-  needs_you: { verb: "needs input", level: "warning" },
+  needs_you: { verb: "needs input", level: "error" },
   done: { verb: "finished", level: "success" },
   failed: { verb: "failed", level: "error" },
 };
