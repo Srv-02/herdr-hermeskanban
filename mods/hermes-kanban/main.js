@@ -287,26 +287,25 @@ export default class HermesKanban extends View {
       .child(div().truncate().child(label)).child(glyph("chevron-down", 12, t.muted));
   }
 
-  // The filter bar, shown with the filter button: state, search, agent (not in single agent mode), priority, grouping.
-  // Agents come as a menu: an instance can have any number of profiles.
+  // The filter bar, shown with the filter button, in two rows: state and the search over the rest of the width (as
+  // ghchecker's field), then priority, agent (a menu: an instance can have any number of profiles; not in single agent
+  // mode) and grouping.
   filterBar(t, agents, agent, single) {
     const label = (text) => div().flex_none().mr(6).text_size(11).text_color(t.muted).child(text);
     const pick = (patch) => (_k, cx) => { this.setFilter(patch(_k)); cx.notify(); };
     return v_flex().flex_none().px(8).pt(8).pb(6).gap(6).border_b(1).border_color(t.border)
       .child(h_flex().gap(8).items_center()
         .child(segmented("state", [["open", "Open"], ["done", "Done"], ["all", "All"]], this.f.state, t, pick((k) => ({ state: k }))))
-        .child(div().flex_1())
-        .child(h_flex().id("search").w(150).h(24).px(8).gap(6).flex_none().items_center().rounded(6).border_1().border_color(t.border).cursor_text()
+        .child(h_flex().id("search").flex_1().min_w(0).h(24).px(8).gap(6).items_center().rounded(6).border_1().border_color(t.border).cursor_text()
           .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
           .child(glyph("search", 12, t.muted))
           .child(Input.new(this.input).flex_1().min_w(0).h_full().text_size(12).text_color(t.foreground))))
-      .when(!single, (e) => e.child(h_flex().gap(2).items_center()
-        .child(label("Agent"))
-        .child(this.dropButton("agent", agent === "all" ? "All" : agent, t,
-          () => this.openMenu("agent", [["all", "All"], ...agents.map((a) => [a, a]), ["none", "none"]], agent)))))
       .child(h_flex().gap(2).items_center()
         .child(label("Prio"))
         .child(segmented("prio", [["all", "All"], ["p1", "P1"], ["p2", "P2"], ["p3+", "P3+"]], this.f.prio, t, pick((k) => ({ prio: k }))))
+        .when(!single, (e) => e.child(div().w(10)).child(label("Agent"))
+          .child(this.dropButton("agent", agent === "all" ? "All" : agent, t,
+            () => this.openMenu("agent", [["all", "All"], ...agents.map((a) => [a, a]), ["none", "none"]], agent))))
         .child(div().flex_1())
         .child(label("Group"))
         .child(segmented("group", [["status", "Status"], ["agent", "Agent"], ["none", "None"]], this.f.group, t, pick((k) => ({ group: k })))));

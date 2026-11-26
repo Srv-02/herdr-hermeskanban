@@ -344,3 +344,15 @@ test("the settings dialog is ghchecker's", () => {
   assert.match(src, /releaseUrl|status\.url/);
   assert.match(code("settings.js"), /if \(checking\(\)\) return;/);
 });
+
+// Two rows: state and a search field over the rest of the width (ghchecker's field: 24 px high), then priority, agent
+// and grouping. No row of its own for the agent menu.
+test("the filter bar: a wide search, the agent menu beside priority and grouping", () => {
+  const src = source("main.js"), bar = src.slice(src.indexOf("filterBar(t, agents"), src.indexOf("// ---- drawing: the list"));
+  assert.match(bar, /\.id\("search"\)\.flex_1\(\)\.min_w\(0\)\.h\(24\)/);
+  assert.doesNotMatch(bar, /\.id\("search"\)\.w\(/, "no fixed width");
+  const rows = bar.split(".child(h_flex().gap(").length - 1;
+  assert.equal(rows, 2, "two rows");
+  const second = bar.slice(bar.lastIndexOf(".child(h_flex().gap("));
+  for (const id of ["prio", "agent", "group"]) assert.match(second, new RegExp(`"${id}"`), id);
+});
