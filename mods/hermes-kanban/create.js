@@ -20,7 +20,7 @@ export class CreateDialog {
     this.machine = machine;
     this.overlay = overlay;
     this.api = createApi(exec, (m) => this.modeOf(m));
-    this.priority = 0; this.assignee = null; this.busy = false; this.error = null; this.created = null; this.settings = null;
+    this.priority = 0; this.assignee = undefined; this.busy = false; this.error = null; this.created = null; this.settings = null;
     this.title = InputState.new({ placeholder: "What should be done?" });
     this.title.on("change", (_e, cx) => { const any = Boolean(this.title.value().trim()); if (any !== this.typed) { this.typed = any; cx.notify(); } });
     this.title.on("submit", (_e, cx) => this.create(cx));
@@ -49,9 +49,10 @@ export class CreateDialog {
     const body = this.body.value().trim();
     if (body) fields.body = body;
     // As Hermes' own board: never unassigned by default. Without a pick (always in single agent mode) the task goes to
-    // the instance's resolved default agent, so it starts also where kanban.default_assignee is unset.
+    // the instance's resolved default agent, so it starts also where kanban.default_assignee is unset. `assignee`:
+    // undefined = no pick, null = "None" picked (sent without agent), else the agent.
     const fallback = this.snap()?.resolvedAssignee || this.snap()?.defaultAssignee || "";
-    if (this.assignee && !this.single()) fields.assignee = this.assignee;
+    if (!this.single() && this.assignee !== undefined) { if (this.assignee) fields.assignee = this.assignee; }
     else if (fallback) fields.assignee = fallback;
     const machine = this.machine, labels = this.snap()?.workflow?.labels ?? {};
     this.busy = true; this.error = null;
@@ -98,7 +99,12 @@ export class CreateDialog {
         .on_click((_e, cx) => { this.assignee = value; cx.notify(); })
         .child(label);
     }));
-    const agentHint = this.assignee ? null : fallback ? `Without an agent, Hermes gives it to ${fallback}.` : "Without an agent the task will not start.";
+    // The hint says what really happens: no pick goes to the resolved default; "None" stays without agent unless
+    // kanban.default_assignee is set, which Hermes' dispatcher gives it to.
+    const configured = snap?.defaultAssignee ?? "";
+    const agentHint = this.assignee ? null
+      : this.assignee === null ? (configured ? `Without an agent; Hermes gives it to ${configured} at the next dispatch.` : "Stays without agent: it does not start.")
+        : fallback ? `Without a pick it goes to ${fallback}.` : "Without an agent the task does not start.";
 
     const foot = h_flex().flex_none().px(20).py(12).gap(8).items_center().border_t(1).border_color(t.border);
     const footer = this.created

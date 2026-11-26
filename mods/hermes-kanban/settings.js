@@ -254,7 +254,11 @@ export class SettingsDialog {
     const snap = this.snap(), configured = snap?.defaultAssignee ?? "", assignee = snap?.resolvedAssignee || configured;
     const source = configured ? "Set in Hermes (kanban.default_assignee)" : "Hermes' active profile (kanban.default_assignee is not set)";
     const about = v_flex().gap(3).child(help(t, assignee ? source : "Set in Hermes (kanban.default_assignee)"))
-      .when(Boolean(m) && !assignee, (e) => e.child(help(t, "Without a default agent, a new task does not start.", c.yellow)));
+      // Only while kanban.default_assignee is not configured: Hermes' dispatcher then leaves unassigned tasks (from
+      // Telegram or the CLI) waiting; this panel still gives new tasks to the resolved default.
+      .when(Boolean(m) && !configured, (e) => e.child(help(t, assignee
+        ? `kanban.default_assignee is not set: tasks from Telegram or the CLI without an agent do not start. Tasks from this panel go to ${assignee}.`
+        : "kanban.default_assignee is not set: tasks from Telegram or the CLI without an agent do not start.", c.yellow)));
     const assigned = row(t, "settings-default-agent", "Default agent", about, [value(t, m ? assignee || "none" : "—")], true)
       .when(!on, (el) => el.opacity(0.45));
     return [single, assigned];

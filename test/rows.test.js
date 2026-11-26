@@ -337,7 +337,7 @@ test("the settings dialog is ghchecker's", () => {
   assert.match(src, /w\(42\)\.h\(24\)/);
   assert.match(src, /py\(13\)/);
   for (const h of ["Updates", "Agents", "Display", "Notifications", "Connection"]) assert.match(src, new RegExp(`heading\\(t, "${h}"`), h);
-  assert.match(src, /"Without a default agent, a new task does not start\."/);
+  assert.match(src, /tasks from Telegram or the CLI without an agent do not start/);
   assert.match(src, /setShared\("hermes-kanban\.config", \{ at: Date\.now\(\) \}\)/);
   assert.match(src, /changedSettings\(/);
   assert.match(src, /UPDATE_PROMPT/);

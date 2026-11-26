@@ -320,3 +320,49 @@ test("status colors: as Hermes' board, review red", async () => {
   assert.deepEqual(["scheduled", "ready", "running", "done", "blocked", "review"].map((s) => color(s)), [c.magenta, c.blue, c.green, t.dim, c.red, c.red]);
   assert.deepEqual(["scheduled", "running", "done", "review"].map((s) => color(s, true)), [t.muted, t.muted, t.muted, c.red]);
 });
+
+// Nachträge 4: no pick goes to the resolved default; an explicit "None" stays without agent. The hint says which.
+test("new task: an explicit None stays unassigned, and the hint tells", async () => {
+  const { CreateDialog } = await import("../mods/hermes-kanban/create.js");
+  const sent = [];
+  herdr.exec = async (cmd, args) => {
+    sent.push(JSON.parse(args[6]));
+    return { code: 0, stdout: `${JSON.stringify({ task: { id: "t_a1b2", title: "x", status: "ready" } })}\n200`, stderr: "" };
+  };
+  herdr.store["hermes-kanban.boards"] = { devbox: { machine: "devbox", mode: "gated", hermes: true, defaultAssignee: "", resolvedAssignee: "default", board: { assignees: ["default", "writer"] } } };
+  const cx = fakeCx();
+  const d = new CreateDialog({ machine: "devbox" }, "overlay", cx);
+  d.settings = { single_agent: [] };
+  let v = draw(() => d.render(cx));
+  assert.match(v.text, /Without a pick it goes to default\./);
+  click("agent-0", cx); // None
+  v = draw(() => d.render(cx));
+  assert.match(v.text, /Stays without agent: it does not start\./);
+  d.title.set_value("hk test");
+  d.create(cx);
+  await cx.settle();
+  assert.equal(sent.length, 1);
+  assert.equal("assignee" in sent[0], false, "None sends no agent");
+  // With kanban.default_assignee set, Hermes' dispatcher gives an unassigned task to it: the hint says so.
+  herdr.store["hermes-kanban.boards"].devbox.defaultAssignee = "default";
+  const d2 = new CreateDialog({ machine: "devbox" }, "overlay", cx);
+  d2.settings = { single_agent: [] };
+  draw(() => d2.render(cx));
+  click("agent-0", cx);
+  assert.match(draw(() => d2.render(cx)).text, /Without an agent; Hermes gives it to default at the next dispatch\./);
+});
+
+// The settings warn only while kanban.default_assignee is not configured: tasks from Telegram or the CLI then do not start.
+test("settings: the warning names Telegram and the CLI, only without kanban.default_assignee", async () => {
+  machine({ dropin: true, env: true, token: true, gated: true });
+  const cx = fakeCx();
+  const WARN = /kanban\.default_assignee is not set: tasks from Telegram or the CLI without an agent do not start\. Tasks from this panel go to default\./;
+  herdr.store["hermes-kanban.boards"] = { devbox: { machine: "devbox", mode: "gated", hermes: true, defaultAssignee: "", resolvedAssignee: "default" } };
+  let d = new SettingsDialog({ settings: true, machine: "devbox" }, "overlay", cx);
+  await cx.settle();
+  assert.match(draw(() => d.render(cx)).text, WARN);
+  herdr.store["hermes-kanban.boards"].devbox.defaultAssignee = "default";
+  d = new SettingsDialog({ settings: true, machine: "devbox" }, "overlay", cx);
+  await cx.settle();
+  assert.doesNotMatch(draw(() => d.render(cx)).text, /Telegram/);
+});
