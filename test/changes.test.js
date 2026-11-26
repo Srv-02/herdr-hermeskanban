@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { STAMP_SCRIPT, parseStamp, diffBoards, toastOf, dotOf, alertsOf, countUnseen, needsYou, badgeOf } from "../mods/hermes-kanban/lib/changes.js";
+import { STAMP_SCRIPT, parseStamp, diffBoards, toastOf, dotOf, alertsOf, countUnseen, needsYou, badgeOf, nextUnseen } from "../mods/hermes-kanban/lib/changes.js";
 
 const t = (id, o = {}) => ({
   machine: "devbox", id, title: `title ${id}`, status: "todo", assignee: "writer", failure: null, failures: 0, warnings: [], ...o,
@@ -148,4 +148,18 @@ test("toastOf in single agent mode names the instance, never the agent", () => {
   assert.equal(toastOf(c("done"), { single: true }).title, "devbox: task finished");
   assert.equal(toastOf(c("failed", { failure: "oom" }), { single: true }).title, "devbox: task failed");
   for (const k of ["needs_you", "done", "failed"]) assert.doesNotMatch(JSON.stringify(toastOf(c(k), { single: true })), /default/);
+});
+
+// The marks "seen" are one per machine, so a quick switch between instances loses none; the instance the panel shows
+// collects nothing (no dot that flashes until the panel marks it seen).
+test("nextUnseen: per-machine seen marks, nothing counted for the shown instance", () => {
+  const changes = [ch("needs_you"), ch("done", { machine: "labbox" })];
+  const unseen = { devbox: { needs: 2, done: 0 }, labbox: { needs: 1, done: 1 } };
+  const r = nextUnseen({ unseen, seen: { devbox: 5, labbox: 7 }, seenAt: { devbox: 4, labbox: 7 }, shown: null, changes, machines: ["devbox", "labbox"] });
+  assert.deepEqual(r.unseen, { devbox: { needs: 1, done: 0 }, labbox: { needs: 1, done: 2 } }, "devbox zeroed by its new mark, then counted");
+  assert.deepEqual(r.seenAt, { devbox: 5, labbox: 7 });
+  const both = nextUnseen({ unseen, seen: { devbox: 5, labbox: 8 }, seenAt: { devbox: 4, labbox: 7 }, shown: null, changes: [], machines: ["devbox", "labbox"] });
+  assert.deepEqual(both.unseen, { devbox: { needs: 0, done: 0 }, labbox: { needs: 0, done: 0 } }, "two marks in one pass both count");
+  const shown = nextUnseen({ unseen: {}, seen: {}, seenAt: {}, shown: "devbox", changes, machines: ["devbox", "labbox"] });
+  assert.deepEqual(shown.unseen, { labbox: { needs: 0, done: 1 } }, "the shown instance collects nothing");
 });

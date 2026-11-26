@@ -89,6 +89,17 @@ export function countUnseen(unseen, changes, machines) {
   return out;
 }
 
+// One pass of the counts: a machine whose mark "seen" (Record<machine, at>, one per machine, written by the panel)
+// is new since the last pass starts from zero; the instance the panel shows now (`shown`) collects nothing, so its dot
+// never flashes. Returns the counts and the marks handled.
+export function nextUnseen({ unseen, seen, seenAt, shown, changes, machines }) {
+  let out = { ...(unseen ?? {}) };
+  const marks = seen && typeof seen === "object" && !Array.isArray(seen) ? seen : {};
+  for (const [m, at] of Object.entries(marks)) if (at !== seenAt?.[m]) out[m] = { needs: 0, done: 0 };
+  out = countUnseen(out, changes.filter((c) => c.machine !== shown), machines);
+  return { unseen: out, seenAt: { ...marks } };
+}
+
 // An unseen needs-you event on that machine: its red strip in the panel of another instance.
 export const needsYou = (unseen, machine) => unseen?.[machine]?.needs > 0;
 

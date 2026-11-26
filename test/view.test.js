@@ -213,3 +213,10 @@ test("pickedAgents: unknown names drop out, single agent mode picks all", () => 
   assert.deepEqual(pickedAgents(["coder"], ["coder"], true), []);
   assert.deepEqual(pickedAgents("coder", ["coder"], false), [], "an old single value is dropped");
 });
+
+// Single agent mode hides the agent: the search does not find a task by it either.
+test("filterTasks: in single agent mode the query does not match the agent", () => {
+  const f = (single) => filterTasks(tasks, { state: "all", query: "analyst", agents: [], prio: "all", single }).map((x) => x.id);
+  assert.deepEqual(f(false), ["t_4"]);
+  assert.deepEqual(f(true), []);
+});

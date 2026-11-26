@@ -118,7 +118,7 @@ export default class HermesKanban extends View {
   }
   tick(cx) {
     // Nothing to do while the panel is hidden or the window can't be seen (minimized, covered, another Space).
-    if (hidden() || hostWindow()?.visible === false) { this.away = true; return; }
+    if (hidden() || hostWindow()?.visible === false) { this.away = true; this.setShown(null); return; }
     const key = JSON.stringify(this.focusNow());
     // The focus moved, the panel came back, or the ages in the rows ("14m") move on.
     if (key !== this.focusKey || this.away || Date.now() - (this.drawnAt ?? 0) > 30000) { this.away = false; cx.notify(); }
@@ -367,7 +367,7 @@ export default class HermesKanban extends View {
   list(t, c, snap, agents, machine, single) {
     // Single agent mode never groups by agent: the names stay hidden.
     const group = single && this.f.group === "agent" ? "status" : this.f.group;
-    const tasks = filterTasks(snap.board.tasks, { state: this.f.state, query: this.query, agents, prio: this.f.prio });
+    const tasks = filterTasks(snap.board.tasks, { state: this.f.state, query: this.query, agents, prio: this.f.prio, single });
     const box = v_flex().flex_1().min_h(0).relative().px(6).py(4);
     if (!tasks.length) {
       this.entries = [];
@@ -426,16 +426,23 @@ export default class HermesKanban extends View {
         .child(div().flex_1().truncate().child(label))));
   }
 
-  // Opening the panel on an instance clears its dot: the watcher zeroes the counts of a machine marked seen. Marked
-  // once per state of the counts, so the write (which re-renders every mod) does not repeat.
+  // Opening the panel on an instance clears its dot: the watcher zeroes the counts of a machine marked seen. One mark
+  // per machine (Record<machine, at>), so switching quickly loses none. Marked once per state of the counts, so the
+  // write (which re-renders every mod) does not repeat.
   markSeen(machine) {
     const unseen = shared("hermes-kanban.unseen") ?? {}, key = (m) => `${unseen[m]?.needs ?? 0}/${unseen[m]?.done ?? 0}`;
     if (this.seenFor && key(this.seenFor.machine) === "0/0") this.seenFor = null;
     const k = key(machine);
     if (k !== "0/0" && !(this.seenFor?.machine === machine && this.seenFor.k === k)) {
       this.seenFor = { machine, k };
-      setShared("hermes-kanban.seen", { machine, at: Date.now() });
+      const marks = shared("hermes-kanban.seen"), base = marks && typeof marks === "object" && typeof marks.machine !== "string" ? marks : {};
+      setShared("hermes-kanban.seen", { ...base, [machine]: Date.now() });
     }
+  }
+  // The instance this panel shows now, for the watcher (it counts nothing new there); null while hidden or no Hermes.
+  // Written only on a change.
+  setShown(machine) {
+    if ((shared("hermes-kanban.shown") ?? null) !== machine) setShared("hermes-kanban.shown", machine);
   }
 
   render(cx) {
@@ -455,7 +462,7 @@ export default class HermesKanban extends View {
     if (this.dialog) return this.dialog.render(cx);
 
     this.drawnAt = Date.now();
-    if (hidden()) { this.away = true; return this.shell(t); }
+    if (hidden()) { this.away = true; this.setShown(null); return this.shell(t); }
     const c = tones(t);
     const pick = shared("hermes-kanban.pick");
     if (pick?.at && pick.at !== this.pickedAt) {
@@ -471,6 +478,7 @@ export default class HermesKanban extends View {
     const focus = this.last = focusedInstance({ ...view, focused: focused() }, this.last);
     this.focusKey = JSON.stringify(focus);
     if (!focus.hermes) {
+      this.setShown(null);
       this.entries = [];
       return this.shell(t).child(this.header(t, c, null, null)).children(this.strips(t, c, null))
         .child(blankslate(t, { icon: "kanban", title: "No Hermes in this pane", tone: t.muted,
@@ -478,7 +486,9 @@ export default class HermesKanban extends View {
     }
     const before = shared("hermes-kanban.lastPanes") ?? {}, lastPanes = rememberPane(before, focus, view.panes);
     if (lastPanes !== before) setShared("hermes-kanban.lastPanes", lastPanes);
-    if (hostWindow()?.visible !== false) this.markSeen(focus.machine);
+    const visible = hostWindow()?.visible !== false;
+    this.setShown(visible ? focus.machine : null);
+    if (visible) this.markSeen(focus.machine);
 
     const boards = shared("hermes-kanban.boards") ?? {};
     const snap = boards?.[focus.machine];

@@ -4,7 +4,7 @@
 // herdr-app check; this file registers no timer.
 //
 // Shared keys: hermes-kanban.boards (Record<machine, Snapshot>), hermes-kanban.unseen (Record<machine, { needs, done }>),
-// hermes-kanban.lastPanes (Record<machine, paneId>), written here; hermes-kanban.seen ({ machine, at }, the panel),
+// hermes-kanban.lastPanes (Record<machine, paneId>), written here; hermes-kanban.seen (Record<machine, at>, the panel), hermes-kanban.shown (the machine the panel shows, or null),
 // hermes-kanban.refresh ({ machine, at }, panel or overlay after an action), hermes-kanban.config ({ at }, after
 // Save in the settings), read here.
 import { spaces, panes, focused, exec, notify, playSound, setBadge, shared, setShared, readTextFile, appHome } from "herdr";
@@ -12,7 +12,7 @@ import { createApi } from "./lib/api.js";
 import { createPoller } from "./lib/poller.js";
 import { loadSettings, isSingleAgent } from "./lib/settings.js";
 import { visibleMachines, focusedInstance, jumpTarget, rememberPane } from "./lib/instances.js";
-import { toastOf, alertsOf, countUnseen, badgeOf } from "./lib/changes.js";
+import { toastOf, alertsOf, nextUnseen, badgeOf } from "./lib/changes.js";
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -24,7 +24,7 @@ function start(w) {
   poller = createPoller({ api, run: (s) => exec(s.cmd, s.args, s.opts), now: Date.now, settings: () => w.settings });
   w.poller = poller;
   // Marks set before this copy watched are old news.
-  w.seenAt = shared("hermes-kanban.seen")?.at;
+  w.seenAt = { ...(shared("hermes-kanban.seen") ?? {}) };
   w.refreshAt = shared("hermes-kanban.refresh")?.at;
 }
 
@@ -50,14 +50,12 @@ async function once(w) {
   const machines = visibleMachines(view.spaces);
   const { snapshots, changes } = await w.poller.tick(machines);
 
-  // Opening the panel of an instance clears its dot: the panel marks it seen, and that zeroes its counts.
-  let unseen = shared("hermes-kanban.unseen") ?? {};
-  const seen = shared("hermes-kanban.seen");
-  if (seen?.at && seen.at !== w.seenAt) {
-    w.seenAt = seen.at;
-    if (typeof seen.machine === "string") unseen = { ...unseen, [seen.machine]: { needs: 0, done: 0 } };
-  }
-  unseen = countUnseen(unseen, changes, machines);
+  // Opening the panel of an instance clears its dot: the panel marks it seen, and that zeroes its counts. The instance
+  // the panel shows collects nothing meanwhile.
+  const next = nextUnseen({ unseen: shared("hermes-kanban.unseen"), seen: shared("hermes-kanban.seen"), seenAt: w.seenAt,
+    shown: shared("hermes-kanban.shown") ?? null, changes, machines });
+  const unseen = next.unseen;
+  w.seenAt = next.seenAt;
   // Each write re-renders every mod: only what changed.
   if (!same(unseen, shared("hermes-kanban.unseen"))) setShared("hermes-kanban.unseen", unseen);
   if (!same(snapshots, shared("hermes-kanban.boards"))) setShared("hermes-kanban.boards", snapshots);

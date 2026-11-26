@@ -10,12 +10,13 @@ export const OPEN_DONE = { open: (t) => t.status !== "done", done: (t) => t.stat
 const PRIO = { all: () => true, p1: (p) => p === 1, p2: (p) => p === 2, "p3+": (p) => p >= 3 };
 
 // `agents`: the picked agents, "none" for tasks without one; none picked means all.
-export function filterTasks(tasks, { state, query, agents, prio }) {
+// `single`: single agent mode, where the agent is hidden and the search does not look at it either.
+export function filterTasks(tasks, { state, query, agents, prio, single = false }) {
   const q = query.trim().toLowerCase();
   return tasks.filter((t) => (OPEN_DONE[state] ?? OPEN_DONE.all)(t)
     && (PRIO[prio] ?? PRIO.all)(t.priority)
     && (!agents.length || agents.includes(t.assignee || "none"))
-    && (q === "" || [t.id, t.title, t.assignee ?? ""].some((s) => s.toLowerCase().includes(q))));
+    && (q === "" || [t.id, t.title, single ? "" : t.assignee ?? ""].some((s) => s.toLowerCase().includes(q))));
 }
 
 // The agent menu picks several: a pick toggles one agent ("none": tasks without one), "all" clears the picks.
