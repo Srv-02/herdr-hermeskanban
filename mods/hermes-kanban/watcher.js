@@ -16,12 +16,14 @@ import { toastOf, alertsOf, nextUnseen, badgeOf, shownMachines } from "./lib/cha
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-// The poller and its API, made at the first pass. A copy that newly holds the lease starts here with no boards, so
-// its first poll of each machine only sets the baseline: no toasts for what happened before.
+// The poller and its API, made at the first pass. A copy that newly holds the lease (after a Herdr restart, a mod
+// update or a takeover) continues from the boards the previous copy shared, when they are fresh (lib/poller.js
+// SEED_MAX_AGE_MS): what changed in the gap reports once. Without a fresh board, a machine's first poll only sets the
+// baseline: no toasts for what happened before.
 function start(w) {
   let poller = null;
   const api = createApi(exec, (machine) => poller.mode(machine));
-  poller = createPoller({ api, run: (s) => exec(s.cmd, s.args, s.opts), now: Date.now, settings: () => w.settings });
+  poller = createPoller({ api, run: (s) => exec(s.cmd, s.args, s.opts), now: Date.now, settings: () => w.settings, seed: shared("hermes-kanban.boards") });
   w.poller = poller;
   // Marks set before this copy watched are old news.
   w.seenAt = { ...(shared("hermes-kanban.seen") ?? {}) };

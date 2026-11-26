@@ -87,12 +87,13 @@ Then click `Hermes` in the tab bar.
 - **Every 30 seconds** (the setting [`poll_seconds`](#settings)) each visible instance gets a cheap check: the modification time in nanoseconds and the size of `~/.hermes/kanban.db` and `kanban.db-wal`. The database is never opened. Only when that changed does the button read the board through Hermes' API; as a safety net it reads it every 5 minutes anyway.
 - The gateway's status, Hermes' workflow (columns and allowed moves) and the default agent are read at the start, after an error and every 5 minutes. A machine without `kanban.db` has no Hermes; it is looked at again every 5 minutes.
 - Switching to an instance shows its last board at once. The button and the panel share the last boards through Herdr's shared state (`hermes-kanban.boards`), which Herdr keeps in `shared.json` in the Herdr app folder. So the last boards of every visible instance, with titles, block summaries and failure texts, are on your Mac's disk and outlive a restart. Leave that file out of backups or dotfile repos you share.
-- **The refresh button** asks for a poll now and turns until it is done. It turns red with a dot when the last poll failed; its tooltip says why. After every action in an overlay the machine is polled at once.
-- A failed poll keeps the last board and reports nothing. The first board of a machine (after Herdr starts, after the machine comes back, after another button copy took over) only sets the baseline: no toasts for what happened before.
+- **The refresh button** asks for a poll now and turns until it is done. It turns red with a dot when the last poll failed, or when no poll came within 30 seconds; its tooltip says why. After every action in an overlay the machine is polled at once.
+- A failed poll keeps the last board and reports nothing. The first board of a machine only sets the baseline: no toasts for what happened before. A new button copy (after a Herdr restart, a mod update or a takeover) continues from the boards the previous copy shared, if they are at most 10 minutes old, so what changed in between reports once. A machine without such a board, also one that comes back after its spaces were closed, starts with a baseline.
+- After a Herdr restart or a mod update the old lease can hold for up to 3 minutes, so no copy polls meanwhile. The panel then still shows the last boards; once no poll came for three times `poll_seconds`, the status bar says `synced 2m ago`.
 
 ### Status bar
 
-At the bottom: `3 running · 1 problem` on the left, the gateway's dot and version (`Gateway v0.23.4`) on the right.
+At the bottom: `3 running · 1 problem` on the left, followed by `synced 4m ago` while no poll came for a while (see [Syncing](#syncing)), the gateway's dot and version (`Gateway v0.23.4`) on the right.
 
 - **running:** the tasks in Running.
 - **problems:** the tasks with an active diagnostic of severity warning or worse, from Hermes' `/diagnostics`. Red when above 0; left out when Hermes does not say.

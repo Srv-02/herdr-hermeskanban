@@ -85,10 +85,26 @@ test("the button is a 92px block's pill as ghchecker's", () => {
   assert.doesNotMatch(src, /dot\.count|c\.yellow\)\.loop/, "no count, no yellow dot");
 });
 
-// A copy that lost the lease keeps no boards: on taking it back, its first poll is a new baseline, not a diff
-// against boards from before (the other copy toasted those changes already).
+// A copy that lost the lease keeps no boards of its own: on taking it back, it continues from what the other copy
+// shared last, not from boards from before (the other copy toasted those changes already).
 test("losing the lease drops the watcher's state", () => {
   assert.match(code("main.js"), /if \(!next\.mine\) \{\s*if \(this\.mine\) this\.watch = \{\};/);
+});
+
+// A new watcher continues from the boards the previous copy shared (lib/poller.js checks their age and shape).
+test("a new watcher seeds its poller from the shared boards", () => {
+  assert.match(source("watcher.js"), /createPoller\(\{[^}]*seed: shared\("hermes-kanban\.boards"\) \}\)/);
+});
+
+// While no copy polls (a fresh one waits for the old lease to expire), the panel says so instead of showing old
+// boards as current: the status bar tells the age, the refresh button that no poll came.
+test("the panel marks a stale snapshot and a refresh that got no poll", () => {
+  const src = source("main.js");
+  assert.match(src, /import \{[^}]*\brefreshState\b[^}]*\bstaleFor\b[^}]*\} from "\.\/lib\/poller\.js";/);
+  assert.match(src, /const stale = staleFor\(snap, Date\.now\(\), this\.settings\)/);
+  assert.match(src, /\.id\("sync-stale"\)/);
+  assert.match(src, /const state = refreshState\(this\.refreshing, machine, snap, Date\.now\(\)\), busy = state === "busy", nopoll = state === "nopoll";/);
+  assert.match(src, /alarm: failed \|\| nopoll/);
 });
 
 // ---- the panel ----

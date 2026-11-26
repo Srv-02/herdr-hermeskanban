@@ -6,7 +6,11 @@
 //
 // Changes are reported against the last good board of the same machine. A machine's first board, also after it left
 // the list and came back, only sets the baseline. A failed poll keeps the last snapshot and reports nothing.
-// Dependencies are injected: api (createApi), run (exec of a { cmd, args, opts } spec), now, settings.
+// A new poller (a new button copy after a Herdr restart, a mod update or a lease takeover) may get `seed`: the
+// snapshots the previous copy shared (hermes-kanban.boards). A seeded machine continues from that snapshot, so what
+// changed in the gap between the two copies reports once, against the last board anyone reported. A seed counts only
+// when it is at most SEED_MAX_AGE_MS old, only for a machine visible at the first tick, and only once.
+// Dependencies are injected: api (createApi), run (exec of a { cmd, args, opts } spec), now, settings, seed.
 import { checkBoard, checkWorkflow, normalizeBoard, normalizeStatus, normalizeWorkflow } from "./board.js";
 import { STAMP_SCRIPT, diffBoards, parseStamp } from "./changes.js";
 import { PROBE_SCRIPT, accessState, parseProbe, scriptSpec } from "./setup.js";
@@ -14,6 +18,11 @@ import { SETTINGS } from "./settings.js";
 
 export const FULL_EVERY = 300000;
 export const META_EVERY = 300000;
+// 10 minutes: well past the lease's 3 minutes plus a Herdr restart, so a quick restart or a mod update loses nothing;
+// short enough that a copy starting after a long pause (the Mac asleep, Herdr closed) does not toast old news.
+export const SEED_MAX_AGE_MS = 600000;
+// The panel's refresh waits this long for a poll before it says that none came.
+export const REFRESH_WAIT_MS = 30000;
 
 const PACES = SETTINGS.find((s) => s.key === "poll_seconds");
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -26,15 +35,42 @@ function blank(machine) {
   };
 }
 
-export function createPoller({ api, run, now, settings }) {
+const paceOf = (values) => {
+  const s = values?.poll_seconds;
+  return (PACES.choices.includes(s) ? s : PACES.default) * 1000;
+};
+
+// How long ago the snapshot's last poll was, when that is longer than three of its paces (no poll came: the copy that
+// polls stopped, or another one has not taken over yet), else null.
+export function staleFor(snap, now, values) {
+  if (!isObj(snap) || typeof snap.at !== "number") return null;
+  const age = now - snap.at;
+  return age > 3 * (snap.hermes ? paceOf(values) : META_EVERY) ? age : null;
+}
+
+// The refresh button for `machine`: "busy" while its refresh `r` ({ machine, at }) waits for a poll, "nopoll" when
+// none came within REFRESH_WAIT_MS, null otherwise.
+export function refreshState(r, machine, snap, now) {
+  if (!r || !machine || r.machine !== machine || (snap?.at ?? 0) >= r.at) return null;
+  return now - r.at < REFRESH_WAIT_MS ? "busy" : "nopoll";
+}
+
+// A shared snapshot of `machine` that a new poller may continue from: its own machine and tasks, a board of the
+// poller's shape (or none), and at most SEED_MAX_AGE_MS old (a stamp in the future counts as too old).
+function seedOf(snap, machine, t) {
+  if (!isObj(snap) || snap.machine !== machine || typeof snap.at !== "number" || snap.at > t || t - snap.at > SEED_MAX_AGE_MS) return null;
+  if (snap.board !== null && !(isObj(snap.board) && Array.isArray(snap.board.tasks) && snap.board.tasks.every((x) => isObj(x) && x.machine === machine && typeof x.id === "string" && Array.isArray(x.warnings)))) return null;
+  return { ...blank(machine), ...snap };
+}
+
+export function createPoller({ api, run, now, settings, seed }) {
   const states = new Map();
   // Set only by a new /api/status or a gateway found down; never cleared when a machine leaves the list.
   const modes = new Map();
+  // The previous copy's snapshots, until the first tick takes or drops them.
+  let seeds = isObj(seed) ? seed : null;
 
-  const pace = () => {
-    const s = settings()?.poll_seconds;
-    return (PACES.choices.includes(s) ? s : PACES.default) * 1000;
-  };
+  const pace = () => paceOf(settings());
 
   function due(st, t) {
     if (!st.snap || st.fullDue) return true;
@@ -143,9 +179,11 @@ export function createPoller({ api, run, now, settings }) {
       const list = [...new Set(machines)];
       for (const m of [...states.keys()]) if (!list.includes(m)) states.delete(m);
       const t = now();
+      const first = seeds;
+      seeds = null;
       const results = await Promise.all(list.map(async (m) => {
         let st = states.get(m);
-        if (!st) states.set(m, st = { snap: null, stamp: null, rawStatus: null, lastPoll: 0, lastFull: 0, lastMeta: 0, metaDue: true, fullDue: false, busy: false });
+        if (!st) states.set(m, st = { snap: first && Object.hasOwn(first, m) ? seedOf(first[m], m, t) : null, stamp: null, rawStatus: null, lastPoll: 0, lastFull: 0, lastMeta: 0, metaDue: true, fullDue: false, busy: false });
         if (st.busy || !due(st, t)) return [];
         st.busy = true;
         st.lastPoll = t;

@@ -22,6 +22,7 @@ import { focusedInstance, visibleMachines, jumpTarget, rememberPane } from "./li
 import { filterTasks, groupTasks, hintOf, prioLabel, agentsLabel, toggleAgent, pickedAgents } from "./lib/view.js";
 import { taskKey } from "./lib/board.js";
 import { ago } from "./lib/time.js";
+import { refreshState, staleFor } from "./lib/poller.js";
 
 const MOD = "hermes-kanban";
 const WATCH = 5000; // the watcher's beat; each instance is polled on its own pace (poll_seconds) within it
@@ -161,8 +162,8 @@ export default class HermesKanban extends View {
   beat(cx) {
     const next = leaseNext(shared("hermes-kanban.lease"), this.me, Date.now());
     if (!next.mine) {
-      // Another copy polls now. Its boards go, so taking the lease back later starts with a new baseline instead of
-      // toasting again what the other copy already reported.
+      // Another copy polls now. Its boards go, so taking the lease back later continues from what the other copy
+      // shared last (watcher.js start) instead of toasting again what it already reported.
       if (this.mine) this.watch = {};
       this.mine = false; this.gate.take(false);
       return;
@@ -230,11 +231,14 @@ export default class HermesKanban extends View {
   }
 
   // The top, as ghchecker's: icon and "Hermes", the instance dim on the right, then +, refresh, filter and settings.
-  // The refresh icon turns until the next poll of the machine and turns red when the last one failed.
+  // The refresh icon turns until the next poll of the machine and turns red when the last one failed, or when no poll
+  // came within 30 s (no copy polls right now: a new one waits up to 3 minutes for the old lease).
   header(t, c, machine, snap) {
-    const gear = gearState(shared("hermes-kanban.update"), this.version), r = this.refreshing;
-    const busy = Boolean(machine && r?.machine === machine && (snap?.at ?? 0) < r.at && Date.now() - r.at < 30000);
+    const gear = gearState(shared("hermes-kanban.update"), this.version);
+    const state = refreshState(this.refreshing, machine, snap, Date.now()), busy = state === "busy", nopoll = state === "nopoll";
     const failed = Boolean(snap?.error) && !busy;
+    const tip = busy ? "Refreshing…" : failed ? `Sync failed: ${snap.error}. Click to try again.`
+      : nopoll ? "No poll came within 30 s. After a Herdr restart or a mod update polling resumes within 3 minutes. Click to try again." : "Refresh";
     // As ghchecker's: a grey dot on the filter icon while the closed second row holds a value other than its default.
     const hiddenSet = !this.filtering && (this.f.prio !== "all" || this.f.group !== "status");
     return h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
@@ -242,8 +246,7 @@ export default class HermesKanban extends View {
       .child(h_flex().flex_1().min_w(0).justify_end().text_size(12).text_color(t.dim).child(div().min_w(0).truncate().child(machine ?? "")))
       .when(Boolean(machine), (x) => x
         .child(this.headButton("new", "plus", false, "New task", () => this.openCreate(machine), t, c))
-        .child(this.headButton("refresh", "refresh", false, busy ? "Refreshing…" : failed ? `Sync failed: ${snap.error}. Click to try again.` : "Refresh",
-          (cx) => { this.refresh(machine); cx.notify(); }, t, c, { spin: busy, alarm: failed }))
+        .child(this.headButton("refresh", "refresh", false, tip, (cx) => { this.refresh(machine); cx.notify(); }, t, c, { spin: busy, alarm: failed || nopoll }))
         .child(this.headButton("filter", "filter", this.filtering, this.filtering ? "Hide priority and grouping" : "Priority and grouping",
           (cx) => { this.setFiltering(!this.filtering); cx.notify(); }, t, c, { marked: hiddenSet })))
       // Settings, also without a Hermes; gold with a slow shine while a newer release is out.
@@ -388,9 +391,11 @@ export default class HermesKanban extends View {
   }
 
   // One line: running tasks and problems (red above 0) on the left, or a warning when the last poll failed; the
-  // gateway's dot (green running, red stopped) and the Hermes version on the right. No sync time.
+  // gateway's dot (green running, red stopped) and the Hermes version on the right. No sync time, unless no poll came
+  // for three paces: then a quiet "synced 4m ago" says the board may be old.
   statusBar(t, c, snap) {
     const running = (snap.board?.tasks ?? []).filter((x) => x.status === "running").length, n = snap.problems;
+    const stale = staleFor(snap, Date.now(), this.settings);
     const gw = snap.status, up = gw?.running === true, version = gw?.version ? String(gw.version).replace(/^v/i, "") : null;
     return h_flex().id("status-bar").h(30).flex_none().px(12).gap(12).items_center().border_t(1).border_color(t.border).bg(t.chrome ?? t.background)
       .text_size(11.5).text_color(t.muted)
@@ -400,6 +405,9 @@ export default class HermesKanban extends View {
         : h_flex().flex_none().gap(5).items_center().child(`${running} running`)
           .when(typeof n === "number", (e) => e.child("·").child(div().text_color(n > 0 ? c.red : t.muted).when(n > 0, (x) => x.font_medium())
             .child(`${n} ${n === 1 ? "problem" : "problems"}`))))
+      .when(stale !== null && !snap.error, (x) => x.child(div().id("sync-stale").flex_none().text_color(t.dim)
+        .tooltip("No poll came for a while, so this board may be old. After a Herdr restart or a mod update polling resumes within 3 minutes.")
+        .child(`synced ${ago(snap.at / 1000, Date.now() / 1000).replace(/^now$/, "1m")} ago`)))
       .child(div().flex_1())
       .child(h_flex().id("gateway").flex_none().gap(5).items_center().tooltip(up ? "Gateway running" : `Gateway ${gw?.state ?? "stopped"}`)
         .child(div().size(7).flex_none().rounded(4).bg(up ? c.green : c.red)).child(version ? `Gateway v${version}` : "Gateway"));

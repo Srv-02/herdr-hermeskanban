@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { FULL_EVERY, META_EVERY, createPoller } from "../mods/hermes-kanban/lib/poller.js";
+import { FULL_EVERY, META_EVERY, REFRESH_WAIT_MS, SEED_MAX_AGE_MS, createPoller, refreshState, staleFor } from "../mods/hermes-kanban/lib/poller.js";
 import { createApi } from "../mods/hermes-kanban/lib/api.js";
 import { REQUEST_SCRIPT } from "../mods/hermes-kanban/lib/request.js";
 import { STAMP_SCRIPT } from "../mods/hermes-kanban/lib/changes.js";
@@ -53,14 +53,21 @@ function world(machines) {
   return { exec, calls, machines };
 }
 
-function setup(machines, { settings = defaults() } = {}) {
+function setup(machines, { settings = defaults(), seed, t: start = 1000000 } = {}) {
   const w = world(machines);
-  let t = 1000000;
+  let t = start;
   let poller = null;
   const api = createApi(w.exec, (m) => poller.mode(m));
-  poller = createPoller({ api, run: (spec) => w.exec(spec.cmd, spec.args, spec.opts), now: () => t, settings: () => settings });
+  poller = createPoller({ api, run: (spec) => w.exec(spec.cmd, spec.args, spec.opts), now: () => t, settings: () => settings, seed });
   const count = (what, on) => w.calls.filter((c) => c.what === what && (!on || c.on === on)).length;
   return { poller, calls: w.calls, count, machines, advance: (ms) => { t += ms; }, at: () => t };
+}
+
+// The snapshots a previous button copy shared (hermes-kanban.boards), as they come back from Herdr's shared state.
+async function previousCopy(machines) {
+  const s = setup(machines);
+  const r = await s.poller.tick(Object.keys(machines));
+  return { boards: JSON.parse(JSON.stringify(r.snapshots)), at: s.at() };
 }
 
 const gated = (over = {}) => ({ ...fixture("status"), ...over });
@@ -352,4 +359,118 @@ test("the default agent is Hermes' resolved one; the configured one stays apart"
   const snap = (await s.poller.tick(["devbox"])).snapshots.devbox;
   assert.equal(snap.defaultAssignee, "", "kanban.default_assignee is not set");
   assert.equal(snap.resolvedAssignee, "default");
+});
+
+// ---- a new button copy (after a Herdr restart, a mod update or a lease takeover) ----
+
+test("a fresh shared snapshot seeds the baseline: what changed in the gap reports once", async () => {
+  const machines = { devbox: { stamp: "1.0", status: gated(), board: board({ id: "t_a1b2", status: "ready" }, { id: "t_c3d4", status: "running" }) } };
+  const prev = await previousCopy(machines);
+  machines.devbox.board = board({ id: "t_a1b2", status: "blocked" }, { id: "t_c3d4", status: "running" });
+  machines.devbox.stamp = "2.0";
+  const s = setup(machines, { seed: prev.boards, t: prev.at + 180000 });
+  let r = await s.poller.tick(["devbox"]);
+  assert.deepEqual(r.changes.map((c) => [c.machine, c.id, c.kind]), [["devbox", "t_a1b2", "needs_you"]], "one change, no storm");
+  assert.deepEqual(ids(r.snapshots.devbox), ["t_a1b2:blocked", "t_c3d4:running"]);
+  s.advance(30000);
+  r = await s.poller.tick(["devbox"]);
+  assert.deepEqual(r.changes, [], "reported once");
+});
+
+test("a seed older than SEED_MAX_AGE_MS is ignored: the first board is a baseline", async () => {
+  assert.equal(SEED_MAX_AGE_MS, 600000);
+  const machines = { devbox: { stamp: "1.0", status: gated(), board: board({ id: "t_a1b2", status: "ready" }) } };
+  const prev = await previousCopy(machines);
+  machines.devbox.board = board({ id: "t_a1b2", status: "blocked" });
+  machines.devbox.stamp = "2.0";
+  let s = setup(machines, { seed: prev.boards, t: prev.at + SEED_MAX_AGE_MS + 1 });
+  assert.deepEqual((await s.poller.tick(["devbox"])).changes, []);
+  s = setup(machines, { seed: prev.boards, t: prev.at + SEED_MAX_AGE_MS });
+  assert.equal((await s.poller.tick(["devbox"])).changes.length, 1, "at the bound it still counts");
+});
+
+test("no seed: a machine's truly first board stays a baseline", async () => {
+  const s = setup({ devbox: { stamp: "1.0", status: gated(), board: board({ id: "t_a1b2", status: "blocked" }) } }, { seed: {} });
+  assert.deepEqual((await s.poller.tick(["devbox"])).changes, []);
+});
+
+test("a seed counts only for a machine visible at the first tick, and only once", async () => {
+  const machines = {
+    devbox: { stamp: "1.0", status: gated(), board: board({ id: "t_a1b2", status: "ready" }) },
+    labbox: { stamp: "1.0", status: gated(), board: board({ id: "t_e5f6", status: "ready" }) },
+  };
+  const prev = await previousCopy(machines);
+  machines.devbox.board = board({ id: "t_a1b2", status: "blocked" });
+  machines.devbox.stamp = "2.0";
+  machines.labbox.board = board({ id: "t_e5f6", status: "blocked" });
+  machines.labbox.stamp = "2.0";
+  const s = setup(machines, { seed: prev.boards, t: prev.at + 60000 });
+  let r = await s.poller.tick(["devbox"]);
+  assert.deepEqual(r.changes.map((c) => c.id), ["t_a1b2"]);
+  // labbox was not visible at the start: it comes back with no fresh snapshot of its own, so a baseline.
+  s.advance(30000);
+  r = await s.poller.tick(["devbox", "labbox"]);
+  assert.deepEqual(r.changes, []);
+  // devbox leaves and comes back: its seed is spent, a new baseline.
+  s.advance(30000);
+  await s.poller.tick(["labbox"]);
+  machines.devbox.board = board({ id: "t_a1b2", status: "done" });
+  machines.devbox.stamp = "3.0";
+  s.advance(30000);
+  r = await s.poller.tick(["devbox", "labbox"]);
+  assert.deepEqual(r.changes, []);
+});
+
+test("a seed of the wrong shape or another machine is ignored", async () => {
+  const machines = { devbox: { stamp: "1.0", status: gated(), board: board({ id: "t_a1b2", status: "ready" }) } };
+  const prev = await previousCopy(machines);
+  machines.devbox.board = board({ id: "t_a1b2", status: "blocked" });
+  machines.devbox.stamp = "2.0";
+  const t = prev.at + 60000, snap = prev.boards.devbox;
+  const bad = [
+    null, "x", { devbox: null }, { devbox: { ...snap, machine: "labbox" } }, { devbox: { ...snap, at: "1" } },
+    { devbox: { ...snap, board: { tasks: "x" } } }, { devbox: { ...snap, board: { ...snap.board, tasks: [{ ...snap.board.tasks[0], machine: "labbox" }] } } },
+    { devbox: { ...snap, at: t + 1 } }, { devbox: { ...snap, board: { ...snap.board, tasks: [{ ...snap.board.tasks[0], warnings: null }] } } },
+  ];
+  for (const seed of bad) {
+    const s = setup(machines, { seed, t });
+    assert.deepEqual((await s.poller.tick(["devbox"])).changes, [], JSON.stringify(seed)?.slice(0, 60));
+  }
+});
+
+test("a failed first poll keeps the seeded board", async () => {
+  const machines = { devbox: { stamp: "1.0", status: gated(), board: board({ id: "t_a1b2", status: "ready" }) } };
+  const prev = await previousCopy(machines);
+  machines.devbox.unreachable = true;
+  const s = setup(machines, { seed: prev.boards, t: prev.at + 60000 });
+  const r = await s.poller.tick(["devbox"]);
+  assert.deepEqual(ids(r.snapshots.devbox), ["t_a1b2:ready"]);
+  assert.match(r.snapshots.devbox.error, /unreachable/);
+  assert.equal(r.snapshots.devbox.at, s.at());
+});
+
+// ---- what the panel tells about a snapshot ----
+
+test("staleFor: a snapshot is stale after three paces without a poll", () => {
+  const snap = { at: 1000000, hermes: true };
+  assert.equal(staleFor(snap, 1000000 + 90000, defaults()), null, "30 s pace: 90 s is still fine");
+  assert.equal(staleFor(snap, 1000000 + 90001, defaults()), 90001);
+  assert.equal(staleFor(snap, 1000000 + 180000, { ...defaults(), poll_seconds: 60 }), null);
+  assert.equal(staleFor(snap, 1000000 + 180001, { ...defaults(), poll_seconds: 60 }), 180001);
+  assert.equal(staleFor(snap, 1000000 + 90001, { poll_seconds: 7 }), 90001, "an unknown pace counts as the default");
+  assert.equal(staleFor({ at: 1000000, hermes: false }, 1000000 + 3 * META_EVERY, defaults()), null, "no Hermes: polled every META_EVERY");
+  assert.equal(staleFor(null, 5, defaults()), null);
+  assert.equal(staleFor({ at: "x" }, 5, defaults()), null);
+});
+
+test("refreshState: busy until a poll comes, then idle; no poll within REFRESH_WAIT_MS reports", () => {
+  assert.equal(REFRESH_WAIT_MS, 30000);
+  const r = { machine: "devbox", at: 1000 };
+  assert.equal(refreshState(null, "devbox", { at: 500 }, 2000), null);
+  assert.equal(refreshState(r, "labbox", { at: 500 }, 2000), null, "another machine's refresh");
+  assert.equal(refreshState(r, "devbox", { at: 500 }, 2000), "busy");
+  assert.equal(refreshState(r, "devbox", null, 2000), "busy");
+  assert.equal(refreshState(r, "devbox", { at: 1500 }, 2000), null, "a poll came");
+  assert.equal(refreshState(r, "devbox", { at: 500 }, 1000 + REFRESH_WAIT_MS), "nopoll");
+  assert.equal(refreshState(r, "devbox", { at: 1500 }, 1000 + REFRESH_WAIT_MS), null);
 });
