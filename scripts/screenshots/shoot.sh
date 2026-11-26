@@ -24,10 +24,8 @@ W=860
 H_HERO=600 H_BOARD=657 H_NOTIFY=689
 # The overlay and the dialog get windows of their own: the task overlay is 0.9 H tall, the settings dialog 0.9 H.
 H_OVERLAY=896 H_DIALOG=940
-# Boxes in raw pixels "y x width height", measured on the raw shots: the toast of the notifications scene (it lies over the
-# bottom of the panel, and the card puts it back there) and the Hermes button at the right end of the tab bar, the task
-# overlay and the settings dialog. Check them on tmp/shots-raw/*.png after a new layout.
-TOAST_BOX="$((2 * H_NOTIFY - 176)) 1008 682 145"
+# Boxes in raw pixels "y x width height", measured on the raw shots: the Hermes button at the right end of the tab bar, the
+# task overlay and the settings dialog. Check them on tmp/shots-raw/*.png after a new layout.
 BUTTON_BOX="12 1542 160 58"
 OVERLAY_BOX="90 104 1512 1612"
 DIALOG_BOX="95 241 1238 1690"
@@ -73,8 +71,8 @@ if want hero; then scene $H_HERO; shot hero; fi
 if want board; then scene $H_BOARD; shot board; fi
 # Overlay: the first row, the blocked release notes, in its overlay (the scene leaves out the ready and running tasks).
 if want overlay; then scene $H_OVERLAY overlay; do_ hermes-kanban.open; sleep 5; shot overlay; fi
-# Notifications: after the baseline, a task on labbox needs input. Shot while its toast shows, with the red strip in the
-# panel of devbox and the red dot on the button.
+# Notifications: after the baseline, a task on labbox needs input: the red strip in the panel of devbox and the red dot on
+# the button. No toast in any image: the scene turns the toasts off (demo-instance.sh).
 if want notifications; then
   scene $H_NOTIFY notifications
   rm -f "$HERDR_APP_HOME/demo-turned"
@@ -118,8 +116,6 @@ if want overlay && [ -f "$RAW/overlay.png" ]; then
 fi
 if want notifications && [ -f "$RAW/notifications.png" ]; then
   panel notifications $H_NOTIFY notifications-panel
-  # shellcheck disable=SC2086
-  box notifications $TOAST_BOX notifications-toast
   # shellcheck disable=SC2086
   box notifications $BUTTON_BOX notifications-button
   render notifications "$ROOT/screenshots/notifications.png" 1022 $((H_NOTIFY + 32))

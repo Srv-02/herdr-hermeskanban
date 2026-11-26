@@ -2,17 +2,13 @@
 <html lang="en"><head><meta charset="utf-8"><title>Notifications card</title>
 <link rel="stylesheet" href="card.css">
 <style>
-/* Left: the panel of devbox with the red strip "labbox needs you", and the toast of the labbox task that needs input where
-   Herdr shows it, over the bottom of the panel. Right: the Hermes button with its red dot. Each at its own size (2x);
-   rendered by shoot.sh at 1022 x (H_NOTIFY + 32). The toast sits at its offset in the raw shot: TOAST_BOX minus the
-   panel's crop origin (y 102, x 813), halved. */
+/* Left: the panel of devbox with the red strip "labbox needs you". Right: the Hermes button with its red dot. No toast.
+   Each at its own size (2x); rendered by shoot.sh at 1022 x (H_NOTIFY + 32). */
 html, body { width: 1022px; height: 721px; }
 .panel { left: 237px; top: 60px; width: 444px; }
-.toast { left: 334.5px; top: 610px; width: 341px; border-radius: 12px; }
 .button { left: 705px; top: 60px; width: 80px; border-radius: 8px; }
 </style></head>
 <body><div class="frame">
   <div class="shot panel"><img src="notifications-panel.png" alt=""></div>
-  <div class="shot toast"><img src="notifications-toast.png" alt=""></div>
   <div class="shot button"><img src="notifications-button.png" alt=""></div>
 </div></body></html>

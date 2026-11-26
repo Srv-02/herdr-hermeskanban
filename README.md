@@ -59,7 +59,7 @@ Then click `Hermes` in the tab bar.
 - **Other instances:** a red strip `labbox needs you` with `Go to pane →` under the header when another visible instance has news for you.
 - **Sounds** and a Dock badge, each with its own switch.
 
-![A toast, the strip for another instance and the dot on the Hermes button](screenshots/notifications.png)
+![The strip for another instance that needs you and the dot on the Hermes button](screenshots/notifications.png)
 
 ### Set up access
 

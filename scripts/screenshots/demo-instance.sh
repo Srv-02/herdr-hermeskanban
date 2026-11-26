@@ -16,7 +16,7 @@
 # environment variable picks one, and remove() refuses anything else.
 # WIN_W and WIN_H at prepare: the window size in points (default 1280 x 940); shoot.sh prepares one size per card.
 # DEMO_SCENE at prepare: board (default), overlay or notifications (demo/hermes.mjs). The notifications scene also
-# checks every 15 s and plays no sound.
+# checks every 15 s and shows no toast and plays no sound (the strip and the dot stay).
 # DEMO_UPDATE=1 at prepare: a made-up release 1.1.0 is "available" (the gold gear and box); otherwise up to date.
 set -eu
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -73,8 +73,8 @@ prepare() {
     const update = { at: Date.now(), local, latest: process.env.DEMO_UPDATE === "1" ? "v1.1.0" : "v" + local };
     fs.writeFileSync(home + "/shared.json", JSON.stringify({ layout: "demo", "frame.welcomed": "finished", "workspace.panels": ["files", "changes", "hermes-kanban"], "hermes-kanban.update": update }));
     fs.writeFileSync(home + "/update-notes.json", JSON.stringify({ last_run: process.argv[2], presented: [] }));
-    // The notifications scene: a quick beat, so the turn shows within seconds, and no sound while shooting.
-    if (process.env.DEMO_SCENE === "notifications") fs.writeFileSync(home + "/hermes-kanban.json", JSON.stringify({ poll_seconds: 15, sound: { needs_you: false } }, null, 2) + "\n");
+    // The notifications scene: a quick beat, so the turn shows within seconds; no toast (no image shows one) and no sound.
+    if (process.env.DEMO_SCENE === "notifications") fs.writeFileSync(home + "/hermes-kanban.json", JSON.stringify({ poll_seconds: 15, toast: { needs_you: false }, sound: { needs_you: false } }, null, 2) + "\n");
   ' "${DEFAULT_LAYOUT:-$HOME/.config/herdr-app/layouts/main.json}" "$("${HERDR_APP_CLI:-herdr-app}" --version | awk '{print $NF}')"
   # The window size in points, read by the app when it starts.
   printf '{"state":"windowed","bounds":[60,30,%s,%s]}' "${WIN_W:-1280}" "${WIN_H:-940}" > "$HERDR_APP_HOME/window.json"
