@@ -1,5 +1,5 @@
 // The dialog of the "+" button: a new task on the instance the panel showed when it was opened. Title (required),
-// description, priority and agent (not in single agent mode, where Hermes assigns through kanban.default_assignee).
+// description, priority and agent (not in single agent mode, where the task goes to the instance's default agent).
 // The machine comes from the props and stays, also when the focus moves on while the dialog is open.
 import { div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, TextareaState, Textarea } from "gpui-base";
@@ -39,7 +39,7 @@ export class CreateDialog {
     if (machine === this.machine && m) this.mode = m;
     return m ?? (machine === this.machine ? this.mode ?? null : null);
   }
-  // Until the settings are read, no agent choice: in single agent mode the mod never assigns.
+  // Until the settings are read, no agent choice: in single agent mode the task goes to the default agent.
   single() { return !this.settings || isSingleAgent(this.settings, this.machine); }
 
   create(cx) {
@@ -48,7 +48,11 @@ export class CreateDialog {
     const fields = { title, priority: this.priority };
     const body = this.body.value().trim();
     if (body) fields.body = body;
+    // As Hermes' own board: never unassigned by default. Without a pick (always in single agent mode) the task goes to
+    // the instance's resolved default agent, so it starts also where kanban.default_assignee is unset.
+    const fallback = this.snap()?.resolvedAssignee || this.snap()?.defaultAssignee || "";
     if (this.assignee && !this.single()) fields.assignee = this.assignee;
+    else if (fallback) fields.assignee = fallback;
     const machine = this.machine, labels = this.snap()?.workflow?.labels ?? {};
     this.busy = true; this.error = null;
     cx.spawn(async (cx) => {
@@ -85,7 +89,7 @@ export class CreateDialog {
       .when(Boolean(hint), (e) => e.child(div().text_size(11).text_color(t.muted).child(hint)));
     const boxed = (id, el) => div().id(id).px(10).py(8).rounded(7).border_1().border_color(t.border).cursor_text().child(el);
 
-    const names = snap?.board?.assignees ?? [], fallback = snap?.defaultAssignee ?? "";
+    const names = snap?.board?.assignees ?? [], fallback = snap?.resolvedAssignee || snap?.defaultAssignee || "";
     const agents = h_flex().gap(6).flex_wrap().children([[null, "None"], ...names.map((n) => [n, n])].map(([value, label], i) => {
       const on = this.assignee === value;
       return h_flex().id(`agent-${i}`).h(26).px(10).items_center().rounded(7).border_1().text_size(12)

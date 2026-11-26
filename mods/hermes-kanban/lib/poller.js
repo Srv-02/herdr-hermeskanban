@@ -21,7 +21,7 @@ const message = (e) => String(e?.message ?? e);
 
 function blank(machine) {
   return {
-    machine, at: 0, board: null, status: null, workflow: null, defaultAssignee: "", mode: null, problems: null,
+    machine, at: 0, board: null, status: null, workflow: null, defaultAssignee: "", resolvedAssignee: "", mode: null, problems: null,
     access: { state: "unknown", removalPending: false }, error: null, unsupported: null, hermes: false,
   };
 }
@@ -121,7 +121,14 @@ export function createPoller({ api, run, now, settings }) {
       if (meta) {
         const [w, o] = await Promise.all([api.workflow(machine), api.orchestration(machine)]);
         if (w.code === 200 && checkWorkflow(w.json)) snap.workflow = normalizeWorkflow(w.json);
-        if (o.code === 200 && isObj(o.json)) snap.defaultAssignee = typeof o.json.default_assignee === "string" ? o.json.default_assignee : "";
+        // default_assignee: what the dispatcher gives unassigned ready tasks (kanban.default_assignee, often unset).
+        // resolved_default_assignee: the instance's default agent as Hermes' own board shows and assigns it (the
+        // configured one, else the active profile, which may itself be called "default").
+        if (o.code === 200 && isObj(o.json)) {
+          const str = (v) => (typeof v === "string" ? v.trim() : "");
+          snap.defaultAssignee = str(o.json.default_assignee);
+          snap.resolvedAssignee = str(o.json.resolved_default_assignee) || snap.defaultAssignee;
+        }
         st.metaDue = false;
         st.lastMeta = t;
       }

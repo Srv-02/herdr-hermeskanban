@@ -267,3 +267,37 @@ test("settings: a failing restart resets the row", async () => {
   assert.match(d.removal.error, /The restart failed: connection lost/);
   assert.deepEqual(herdr.store["hermes-kanban.restarting"], {});
 });
+
+// kanban.default_assignee unset: Hermes still has a default agent (its active profile), shown as such, no warning.
+test("settings: the default agent is Hermes' resolved one", async () => {
+  machine({ dropin: true, env: true, token: true, gated: true });
+  const cx = fakeCx();
+  herdr.store["hermes-kanban.boards"] = { devbox: { machine: "devbox", mode: "gated", hermes: true, defaultAssignee: "", resolvedAssignee: "default" } };
+  const d = new SettingsDialog({ settings: true, machine: "devbox" }, "overlay", cx);
+  await cx.settle();
+  const v = draw(() => d.render(cx));
+  assert.ok(!v.text.includes("Without a default agent"), "no warning while Hermes has a default agent");
+  assert.ok(!/\bnone\b/.test(v.text), "the value is not none");
+  assert.match(v.text, /Default agent\n[^]*\bdefault\b/);
+});
+
+// Hermes' own board never leaves a new task unassigned: without a pick it takes the resolved default agent, so the task
+// starts also where kanban.default_assignee is unset (the dispatcher fills only that one in).
+test("new task: without a picked agent it goes to Hermes' default agent", async () => {
+  const { CreateDialog } = await import("../mods/hermes-kanban/create.js");
+  const sent = [];
+  herdr.exec = async (cmd, args, opts) => {
+    assert.equal(opts.on, "devbox");
+    sent.push(JSON.parse(args[6]));
+    return { code: 0, stdout: `${JSON.stringify({ task: { id: "t_a1b2", title: "x", status: "ready", assignee: "default" } })}\n200`, stderr: "" };
+  };
+  herdr.store["hermes-kanban.boards"] = { devbox: { machine: "devbox", mode: "gated", hermes: true, defaultAssignee: "", resolvedAssignee: "default", board: { assignees: ["default"] } } };
+  const cx = fakeCx();
+  const d = new CreateDialog({ machine: "devbox" }, "overlay", cx);
+  await cx.settle();
+  d.title.set_value("hk test");
+  d.create(cx);
+  await cx.settle();
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].assignee, "default");
+});

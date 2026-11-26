@@ -8,7 +8,7 @@ export const CONFIG_FILE = "hermes-kanban.json";
 
 export const SETTINGS = [
   { key: "single_agent", type: "machines", default: [], label: "Single agent mode",
-    about: "Per instance: the agent filter and the agent choice disappear. Hermes assigns new tasks through its kanban.default_assignee; the mod never assigns one itself." },
+    about: "Per instance: the agent filter and the agent choice disappear. New tasks go to the instance's default agent, and agent names are hidden for it." },
   { key: "status.color", type: "choice", choices: ["color", "mono"], default: "color", label: "Status colors",
     about: "Mono draws every status in one quiet color. Tasks that need you stay red." },
   { key: "toast.needs_you", type: "boolean", default: true, label: "Toast when a task needs you",

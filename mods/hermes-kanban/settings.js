@@ -250,8 +250,10 @@ export class SettingsDialog {
       ? row(t, "settings-single_agent", "Single agent mode", help(t, `Hides the agent filter and picker on ${m}. Hermes assigns new tasks to its default agent.`),
         [toggle(t, "settings-single_agent-switch", on, (_e, cx) => this.set("single_agent", on ? list.filter((x) => x !== m) : [...list, m], cx))])
       : row(t, "settings-single_agent", "Single agent mode", help(t, "Per instance. Open the settings from a Hermes pane to set it for that instance."), []);
-    const assignee = this.snap()?.defaultAssignee ?? "";
-    const about = v_flex().gap(3).child(help(t, "Set in Hermes (kanban.default_assignee)"))
+    // Hermes' resolved default: kanban.default_assignee, else its active profile (lib/poller.js).
+    const snap = this.snap(), configured = snap?.defaultAssignee ?? "", assignee = snap?.resolvedAssignee || configured;
+    const source = configured ? "Set in Hermes (kanban.default_assignee)" : "Hermes' active profile (kanban.default_assignee is not set)";
+    const about = v_flex().gap(3).child(help(t, assignee ? source : "Set in Hermes (kanban.default_assignee)"))
       .when(Boolean(m) && !assignee, (e) => e.child(help(t, "Without a default agent, a new task does not start.", c.yellow)));
     const assigned = row(t, "settings-default-agent", "Default agent", about, [value(t, m ? assignee || "none" : "—")], true)
       .when(!on, (el) => el.opacity(0.45));

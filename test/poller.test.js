@@ -46,7 +46,7 @@ function world(machines) {
     if (route === "/api/status") return m.status ? answer(m.status) : { code: 7, stdout: "", stderr: "curl: (7) Failed to connect" };
     if (route === "/board") return answer(m.board, m.boardCode ?? 200);
     if (route === "/workflow") return answer(fixture("workflow"));
-    if (route === "/orchestration") return answer({ ...fixture("orchestration"), default_assignee: m.defaultAssignee ?? "writer" });
+    if (route === "/orchestration") return answer({ ...fixture("orchestration"), default_assignee: m.defaultAssignee ?? "writer", ...(m.resolved !== undefined ? { resolved_default_assignee: m.resolved } : {}) });
     if (route === "/diagnostics") return answer(fixture("diagnostics"));
     throw new Error(`unexpected ${route}`);
   };
@@ -343,4 +343,13 @@ test("/diagnostics only follows a board answered with 200", async () => {
   await s.poller.tick(["devbox"]);
   assert.equal(s.count("/board"), 2);
   assert.equal(s.count("/diagnostics"), 0);
+});
+
+// Hermes' own board assigns new tasks to resolved_default_assignee (kanban.default_assignee, else the active profile):
+// that is the instance's default agent. default_assignee alone is what the dispatcher fills unassigned tasks with.
+test("the default agent is Hermes' resolved one; the configured one stays apart", async () => {
+  const s = setup({ devbox: { stamp: "1.0", status: gated(), board: board({ id: "t_a1b2", status: "ready" }), defaultAssignee: "", resolved: "default" } });
+  const snap = (await s.poller.tick(["devbox"])).snapshots.devbox;
+  assert.equal(snap.defaultAssignee, "", "kanban.default_assignee is not set");
+  assert.equal(snap.resolvedAssignee, "default");
 });

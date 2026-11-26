@@ -34,3 +34,17 @@ export const v_flex = () => el();
 export const h_flex = () => el();
 export const Scrollbar = { vertical: () => el() };
 export class View {}
+
+// Text fields: a value the test sets, handlers it can fire.
+class FieldState {
+  static new() { return new this(); }
+  constructor() { this.text = ""; this.handlers = {}; }
+  value() { return this.text; }
+  set_value(v) { this.text = v; }
+  on(name, fn) { this.handlers[name] = fn; }
+  focus() {} blur() {} set_auto_grow() {}
+}
+export class InputState extends FieldState {}
+export class TextareaState extends FieldState {}
+export const Input = { new: () => el() };
+export const Textarea = { new: () => el() };
