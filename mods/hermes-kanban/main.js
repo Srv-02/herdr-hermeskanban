@@ -14,7 +14,7 @@ import { CreateDialog } from "./create.js";
 import { SettingsDialog } from "./settings.js";
 import { Access } from "./access.js";
 import { tones, alpha, glyph, glyphOf, segmented, chip, blankslate, look, GOLD } from "./ui.js";
-import { dotOf, needsYou } from "./lib/changes.js";
+import { dotOf, needsYou, shownNext } from "./lib/changes.js";
 import { loadSettings, defaults, isSingleAgent } from "./lib/settings.js";
 import { createUpdateGate, updateCheck, fetchLatest, localVersion, gearState } from "./lib/update.js";
 import { leaseNext } from "./lib/lease.js";
@@ -439,10 +439,12 @@ export default class HermesKanban extends View {
       setShared("hermes-kanban.seen", { ...base, [machine]: Date.now() });
     }
   }
-  // The instance this panel shows now, for the watcher (it counts nothing new there); null while hidden or no Hermes.
-  // Written only on a change.
+  // The instance this panel copy shows now, for the watcher (it counts nothing new there); null while hidden or no
+  // Hermes. One entry per copy, written only on a change or to renew it (lib/changes.js shownNext).
   setShown(machine) {
-    if ((shared("hermes-kanban.shown") ?? null) !== machine) setShared("hermes-kanban.shown", machine);
+    this.copy ??= (Math.random().toString(36).slice(2) + "00000000").slice(0, 8);
+    const next = shownNext(shared("hermes-kanban.shown"), this.copy, machine, Date.now());
+    if (next) setShared("hermes-kanban.shown", next);
   }
 
   render(cx) {

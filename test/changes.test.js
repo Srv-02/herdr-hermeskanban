@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { STAMP_SCRIPT, parseStamp, diffBoards, toastOf, dotOf, alertsOf, countUnseen, needsYou, badgeOf, nextUnseen } from "../mods/hermes-kanban/lib/changes.js";
+import { STAMP_SCRIPT, parseStamp, diffBoards, toastOf, dotOf, alertsOf, countUnseen, needsYou, badgeOf, nextUnseen, shownNext, shownMachines } from "../mods/hermes-kanban/lib/changes.js";
 
 const t = (id, o = {}) => ({
   machine: "devbox", id, title: `title ${id}`, status: "todo", assignee: "writer", failure: null, failures: 0, warnings: [], ...o,
@@ -155,11 +155,32 @@ test("toastOf in single agent mode names the instance, never the agent", () => {
 test("nextUnseen: per-machine seen marks, nothing counted for the shown instance", () => {
   const changes = [ch("needs_you"), ch("done", { machine: "labbox" })];
   const unseen = { devbox: { needs: 2, done: 0 }, labbox: { needs: 1, done: 1 } };
-  const r = nextUnseen({ unseen, seen: { devbox: 5, labbox: 7 }, seenAt: { devbox: 4, labbox: 7 }, shown: null, changes, machines: ["devbox", "labbox"] });
+  const r = nextUnseen({ unseen, seen: { devbox: 5, labbox: 7 }, seenAt: { devbox: 4, labbox: 7 }, shown: [], changes, machines: ["devbox", "labbox"] });
   assert.deepEqual(r.unseen, { devbox: { needs: 1, done: 0 }, labbox: { needs: 1, done: 2 } }, "devbox zeroed by its new mark, then counted");
   assert.deepEqual(r.seenAt, { devbox: 5, labbox: 7 });
-  const both = nextUnseen({ unseen, seen: { devbox: 5, labbox: 8 }, seenAt: { devbox: 4, labbox: 7 }, shown: null, changes: [], machines: ["devbox", "labbox"] });
+  const both = nextUnseen({ unseen, seen: { devbox: 5, labbox: 8 }, seenAt: { devbox: 4, labbox: 7 }, shown: [], changes: [], machines: ["devbox", "labbox"] });
   assert.deepEqual(both.unseen, { devbox: { needs: 0, done: 0 }, labbox: { needs: 0, done: 0 } }, "two marks in one pass both count");
-  const shown = nextUnseen({ unseen: {}, seen: {}, seenAt: {}, shown: "devbox", changes, machines: ["devbox", "labbox"] });
+  const shown = nextUnseen({ unseen: {}, seen: {}, seenAt: {}, shown: ["devbox"], changes, machines: ["devbox", "labbox"] });
   assert.deepEqual(shown.unseen, { labbox: { needs: 0, done: 1 } }, "the shown instance collects nothing");
+});
+
+// hermes-kanban.shown is one entry per panel copy: copies showing different machines never overwrite each other, a
+// copy writes only on a change (and refreshes its time at most every 30 s), and an entry older than 2 minutes is gone.
+test("shownNext: one entry per copy, written only on a change", () => {
+  const a = shownNext(null, "A", "devbox", 1000);
+  assert.deepEqual(a, { A: { machine: "devbox", at: 1000 } });
+  const ab = shownNext(a, "B", "labbox", 2000);
+  assert.deepEqual(ab, { A: { machine: "devbox", at: 1000 }, B: { machine: "labbox", at: 2000 } }, "two copies, two machines");
+  assert.equal(shownNext(ab, "A", "devbox", 20000), null, "unchanged: no write");
+  assert.deepEqual(shownNext(ab, "A", "devbox", 31000).A, { machine: "devbox", at: 31000 }, "refreshed after 30 s");
+  assert.deepEqual(shownNext(ab, "A", null, 5000), { B: { machine: "labbox", at: 2000 } }, "hidden: the entry goes");
+  assert.equal(shownNext({ B: { machine: "labbox", at: 2000 } }, "A", null, 5000), null, "nothing to remove: no write");
+  assert.deepEqual(Object.keys(shownNext({ B: { machine: "labbox", at: 0 } }, "A", "devbox", 200000)), ["A"], "stale entries are pruned on a write");
+});
+
+test("shownMachines: fresh entries only", () => {
+  const rec = { A: { machine: "devbox", at: 100000 }, B: { machine: "labbox", at: 1000 }, C: "junk" };
+  assert.deepEqual(shownMachines(rec, 110000), ["devbox", "labbox"]);
+  assert.deepEqual(shownMachines(rec, 130000), ["devbox"], "an entry older than 2 minutes is gone");
+  assert.deepEqual(shownMachines(null, 0), []);
 });

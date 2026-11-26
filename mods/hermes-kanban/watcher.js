@@ -4,7 +4,7 @@
 // herdr-app check; this file registers no timer.
 //
 // Shared keys: hermes-kanban.boards (Record<machine, Snapshot>), hermes-kanban.unseen (Record<machine, { needs, done }>),
-// hermes-kanban.lastPanes (Record<machine, paneId>), written here; hermes-kanban.seen (Record<machine, at>, the panel), hermes-kanban.shown (the machine the panel shows, or null),
+// hermes-kanban.lastPanes (Record<machine, paneId>), written here; hermes-kanban.seen (Record<machine, at>, the panel), hermes-kanban.shown (Record<panel copy, { machine, at }>, the panels),
 // hermes-kanban.refresh ({ machine, at }, panel or overlay after an action), hermes-kanban.config ({ at }, after
 // Save in the settings), read here.
 import { spaces, panes, focused, exec, notify, playSound, setBadge, shared, setShared, readTextFile, appHome } from "herdr";
@@ -12,7 +12,7 @@ import { createApi } from "./lib/api.js";
 import { createPoller } from "./lib/poller.js";
 import { loadSettings, isSingleAgent } from "./lib/settings.js";
 import { visibleMachines, focusedInstance, jumpTarget, rememberPane } from "./lib/instances.js";
-import { toastOf, alertsOf, nextUnseen, badgeOf } from "./lib/changes.js";
+import { toastOf, alertsOf, nextUnseen, badgeOf, shownMachines } from "./lib/changes.js";
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -53,7 +53,7 @@ async function once(w) {
   // Opening the panel of an instance clears its dot: the panel marks it seen, and that zeroes its counts. The instance
   // the panel shows collects nothing meanwhile.
   const next = nextUnseen({ unseen: shared("hermes-kanban.unseen"), seen: shared("hermes-kanban.seen"), seenAt: w.seenAt,
-    shown: shared("hermes-kanban.shown") ?? null, changes, machines });
+    shown: shownMachines(shared("hermes-kanban.shown"), Date.now()), changes, machines });
   const unseen = next.unseen;
   w.seenAt = next.seenAt;
   // Each write re-renders every mod: only what changed.

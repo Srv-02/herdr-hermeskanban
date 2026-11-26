@@ -90,15 +90,34 @@ export function countUnseen(unseen, changes, machines) {
 }
 
 // One pass of the counts: a machine whose mark "seen" (Record<machine, at>, one per machine, written by the panel)
-// is new since the last pass starts from zero; the instance the panel shows now (`shown`) collects nothing, so its dot
-// never flashes. Returns the counts and the marks handled.
+// is new since the last pass starts from zero; the instances a panel shows now (`shown`, shownMachines) collect
+// nothing, so their dot never flashes. Returns the counts and the marks handled.
 export function nextUnseen({ unseen, seen, seenAt, shown, changes, machines }) {
   let out = { ...(unseen ?? {}) };
   const marks = seen && typeof seen === "object" && !Array.isArray(seen) ? seen : {};
   for (const [m, at] of Object.entries(marks)) if (at !== seenAt?.[m]) out[m] = { needs: 0, done: 0 };
-  out = countUnseen(out, changes.filter((c) => c.machine !== shown), machines);
+  out = countUnseen(out, changes.filter((c) => !(shown ?? []).includes(c.machine)), machines);
   return { unseen: out, seenAt: { ...marks } };
 }
+
+// hermes-kanban.shown: Record<copy, { machine, at }>, one entry per panel copy (a panel can show in several windows
+// and layouts). A copy writes only when its machine changes, and renews its time at most every SHOWN_RENEW_MS; an
+// entry older than SHOWN_TTL_MS belongs to a copy that is gone. shownNext gives the record to write, or null for none.
+const SHOWN_RENEW_MS = 30000, SHOWN_TTL_MS = 120000;
+const fresh = (e, now) => e && typeof e === "object" && typeof e.machine === "string" && typeof e.at === "number" && now - e.at <= SHOWN_TTL_MS;
+export function shownNext(record, copy, machine, now) {
+  const mine = record?.[copy];
+  if (machine == null) {
+    if (!mine) return null;
+    const { [copy]: _gone, ...rest } = record;
+    return rest;
+  }
+  if (mine?.machine === machine && now - mine.at < SHOWN_RENEW_MS) return null;
+  const others = Object.fromEntries(Object.entries(record ?? {}).filter(([k, e]) => k !== copy && fresh(e, now)));
+  return { ...others, [copy]: { machine, at: now } };
+}
+// The machines a panel copy shows now: those of the fresh entries.
+export const shownMachines = (record, now) => [...new Set(Object.values(record ?? {}).filter((e) => fresh(e, now)).map((e) => e.machine))];
 
 // An unseen needs-you event on that machine: its red strip in the panel of another instance.
 export const needsYou = (unseen, machine) => unseen?.[machine]?.needs > 0;
