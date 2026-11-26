@@ -1,6 +1,7 @@
 // npm run lint: every script parses, the mod avoids what herdr's QuickJS lacks, and nothing in the mod is dead:
 // no unused import, no export no other file of the mod imports, no icon nobody draws and no drawn icon missing, and
-// no .hover() on an element without an .id(). With a local tmp/denylist.txt (gitignored, one word per line), no
+// no .hover() on an element without an .id(). No tracked file refers to the internal documents of the mod's making
+// (ruling ids, addenda, design sections, drafts). With a local tmp/denylist.txt (gitignored, one word per line), no
 // tracked file may contain one of its words (whole word, any case).
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -77,17 +78,33 @@ for (const [f, src] of Object.entries(text)) {
   for (const h of hoverWithoutId(src)) problems.push(`${rel(f)}:${h.line}: .hover() without .id() (${h.chain})`);
 }
 
+// Tracked files and new files git would track (docs/superpowers/ is local only), with their content.
+const tracked = spawnSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd: root, encoding: "utf8" }).stdout.split("\0").filter(Boolean)
+  .filter((t) => !t.startsWith("docs/superpowers/"))
+  .flatMap((t) => {
+    const p = path.join(root, t);
+    if (!fs.existsSync(p) || !fs.statSync(p).isFile()) return [];
+    return [[t, fs.readFileSync(p, "utf8")]];
+  });
+
+// No internal process references: the repo is public, the documents of its making are not. Ruling ids (a capital R
+// and one or two digits), the German name of the design's addenda, a quoted design section and the word for a design
+// draft must not appear; explain the reason in plain words instead.
+const internal = [/\bR\d{1,2}\b/, /Nachtr(?:ag|äge|aege)/i, /\bspec\s+"/i, /\bmock-?ups?\b/i];
+for (const [t, content] of tracked) {
+  if (content.includes("\0")) continue; // binary (the PNGs)
+  content.split("\n").forEach((line, n) => {
+    if (internal.some((re) => re.test(line))) problems.push(`${t}:${n + 1}: internal process reference (ruling id, addenda, design section or draft)`);
+  });
+}
+
 // Denylist: words that must never reach the repo (machine names, user names, ...). The list itself stays local.
-// Checks tracked files and new files git would track; reports the line, never the word.
+// Checks the tracked files above; reports the line, never the word.
 const denyFile = path.join(root, "tmp/denylist.txt");
 if (fs.existsSync(denyFile)) {
   const escape = (w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const words = fs.readFileSync(denyFile, "utf8").split("\n").map((w) => w.trim()).filter(Boolean);
-  const tracked = spawnSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd: root, encoding: "utf8" }).stdout.split("\0").filter(Boolean);
-  for (const t of tracked) {
-    const p = path.join(root, t);
-    if (!fs.existsSync(p) || !fs.statSync(p).isFile()) continue;
-    const content = fs.readFileSync(p, "utf8");
+  for (const [t, content] of tracked) {
     const res = words.map((w) => new RegExp(`(?<![\\w])${escape(w)}(?![\\w])`, "i"));
     content.split("\n").forEach((line, n) => {
       if (res.some((re) => re.test(line))) problems.push(`${t}:${n + 1}: contains a denylisted word`);

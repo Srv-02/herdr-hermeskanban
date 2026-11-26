@@ -112,7 +112,7 @@ test("the panel reads only the focused machine's board", () => {
   assert.doesNotMatch(src, /\.\.\.\w+\.board\.tasks/, "no spreading of one board's tasks into another list");
 });
 
-// R14: the panel follows the focus on its own 3 s beat, never during herdr-app check.
+// The panel follows the focus on its own 3 s beat, never during herdr-app check.
 test("the panel's follow-me timer runs after a checking() guard", () => {
   const src = code("main.js"), timer = src.indexOf("cx.timer.every(TICK,");
   assert.ok(timer >= 0, "the panel starts its 3 s timer");
@@ -162,7 +162,7 @@ test("the header is ghchecker's", () => {
 
 // ---- the task overlay and the new task dialog ----
 
-// R24: both overlays write to one machine, the one in their props. They never look at the focus.
+// Both overlays write to one machine, the one in their props. They never look at the focus.
 test("the overlay takes its machine from props, never from focus", () => {
   for (const f of ["viewer.js", "create.js"]) {
     const src = code(f);
@@ -241,7 +241,7 @@ test("the overlay draws the description as plain text", () => {
 
 // ---- access and the settings dialog ----
 
-// R25: the settings footer as ghchecker's.
+// The settings footer as ghchecker's.
 test("the settings footer links GitHub and Buy me a coffee", () => {
   const src = source("settings.js");
   assert.match(src, /import \{[^}]*\bGITHUB_URL\b[^}]*\} from "\.\/lib\/update\.js"/);
@@ -269,7 +269,7 @@ test("clickHandlers finds the span of each handler", () => {
   assert.deepEqual(inside, [false, true]);
 });
 
-// Spec: no automatic restart. The restart's spec is built only inside a click handler, and only in the two files that
+// The mod never restarts a gateway on its own. The restart's exec spec is built only inside a click handler, and only in the two files that
 // offer the button.
 test("the mod never restarts without a click", () => {
   const files = fs.readdirSync(dir, { recursive: true }).filter((f) => f.endsWith(".js") && f !== path.join("lib", "setup.js"));
@@ -284,7 +284,7 @@ test("the mod never restarts without a click", () => {
   for (const f of files) assert.doesNotMatch(source(f), /"gateway", "restart"/, f);
 });
 
-// R18: setup, restart and removal stay on the machine of the first click; they never read the focus.
+// Setup, restart and removal stay on the machine of the first click; they never read the focus.
 test("access and settings bind their machine and never read the focus", () => {
   for (const f of ["access.js", "settings.js"]) {
     const src = code(f);
@@ -345,7 +345,7 @@ test("the settings dialog is ghchecker's", () => {
   assert.match(code("settings.js"), /if \(checking\(\)\) return;/);
 });
 
-// Spec Nachträge 3: one row always shown (state, the agents menu, the search over the rest with a clear button while
+// The filter bar: one row always shown (state, the agents menu, the search over the rest with a clear button while
 // it has text); the filter button adds a second row below a divider line with priority and grouping.
 test("the filter bar: one row always, priority and grouping behind the filter button", () => {
   const src = source("main.js"), bar = src.slice(src.indexOf("filterBar(t, agents"), src.indexOf("// ---- drawing: the list"));
@@ -392,7 +392,7 @@ test("the filter button marks hidden filters with ghchecker's dot", () => {
   assert.match(src, /\.when\(marked \|\| alarm \|\| gold, \(e\) => e\.child\(div\(\)\.absolute\(\)\.top\(2\)\.right\(2\)\.size\(6\)\.rounded\(3\)\.bg\(gold \? GOLD : alarm \? c\.red : t\.muted\)\)\)/);
 });
 
-// Nachträge 4: the new task dialog is as tall as its content (no fixed height) and its description field taller.
+// The new task dialog is as tall as its content (no fixed height) and its description field taller.
 test("the new task dialog sizes to its content", () => {
   const main = source("main.js"), create = source("create.js");
   assert.match(main, /openCreate\(machine\) \{\n    openOverlay\(\{ mod: MOD, kind: "dialog", modal: true, frame: "none", width: 560, props: \{ create: \{ machine \} \} \}\);/);

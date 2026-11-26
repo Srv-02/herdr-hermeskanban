@@ -321,7 +321,7 @@ test("status colors: as Hermes' board, review red", async () => {
   assert.deepEqual(["scheduled", "running", "done", "review"].map((s) => color(s, true)), [t.muted, t.muted, t.muted, c.red]);
 });
 
-// Nachträge 4: no pick goes to the resolved default; an explicit "None" stays without agent. The hint says which.
+// New task: no pick goes to the resolved default; an explicit "None" stays without agent. The hint says which.
 test("new task: an explicit None stays unassigned, and the hint tells", async () => {
   const { CreateDialog } = await import("../mods/hermes-kanban/create.js");
   const sent = [];

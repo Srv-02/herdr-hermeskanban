@@ -46,7 +46,7 @@ function fakeMachine({ units = UNIT, pid = "0", python = true } = {}) {
 }
 const mode = (f) => fs.statSync(f).mode & 0o777;
 
-test("DROPIN_TEXT is the spec's text", () => assert.equal(DROPIN_TEXT,
+test("DROPIN_TEXT names the mod, the way to remove it and the key file", () => assert.equal(DROPIN_TEXT,
   '# Written by the Herdr hermes-kanban mod. "Remove access" in its settings deletes this file.\n[Service]\nEnvironment="HERMES_DASHBOARD_SESSION_TOKEN=file:%h/.hermes/dashboard.token"\n'));
 
 test("DROPIN_NAME and UNIT_RE", () => {
@@ -215,7 +215,7 @@ test("scriptSpec and restartSpec bind to the machine", () => {
   assert.deepEqual(restartSpec("labbox"), { cmd: "hermes", args: ["gateway", "restart"], opts: { on: "labbox", timeout: 600000 } });
 });
 
-// ---- the flow in the panel and the settings (Task 12) ----
+// ---- the flow in the panel and the settings ----
 
 test("SETUP_STEPS name the drop-in path and say there is no automatic restart", () => {
   assert.equal(SETUP_STEPS.length, 5);

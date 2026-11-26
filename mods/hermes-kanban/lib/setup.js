@@ -1,4 +1,4 @@
-// Access to a gated Hermes instance (spec "Setup und Entfernen"): a key in ~/.hermes/dashboard.token and a systemd
+// Access to a gated Hermes instance: a key in ~/.hermes/dashboard.token and a systemd
 // drop-in that hands it to the gateway as HERMES_DASHBOARD_SESSION_TOKEN=file:…. The scripts run on the machine with
 // sh -c and get the unit name only as $1, checked against UNIT_RE there. They never print the key. HK_PROC (default
 // /proc) is a hook for the tests only.
@@ -137,7 +137,7 @@ export function scriptSpec(machine, script, args, timeout = 30000) {
   return { cmd: "sh", args: ["-c", script, "sh", ...args], opts: { on: machine, timeout } };
 }
 
-// Drain-aware restart; only ever on an explicit click (spec: no automatic restart).
+// Drain-aware restart; only ever on an explicit click, the mod never restarts a gateway on its own.
 export function restartSpec(machine) {
   return { cmd: "hermes", args: ["gateway", "restart"], opts: { on: machine, timeout: 600000 } };
 }
@@ -163,7 +163,7 @@ export function accessState({ status, probe, statsCode }) {
 
 // ---- the flow in the panel (access.js) and in the settings (settings.js) ----
 
-// What "Set up access" does, shown before it runs (spec "Setup und Entfernen", steps 1-5).
+// What "Set up access" does, shown before it runs, one line per step.
 export const SETUP_STEPS = [
   `Create a key, only if it is missing: umask 077 and Hermes' own generator, python3 -c "import secrets; print(secrets.token_urlsafe(32))", into ~/${TOKEN_FILES.gated}.`,
   `Add a drop-in for the gateway's systemd unit, mode 0600, at ~/.config/systemd/user/<gateway unit>.d/${DROPIN_NAME} (the unit is found on the machine):\n${DROPIN_TEXT.trim()}`,
@@ -202,7 +202,7 @@ export function setupUnit(probe) {
   return picked.unit ? { unit: picked.unit } : { error: ACCESS_TEXT.wrong_user.body };
 }
 
-// The next step of "Remove access", in the spec's order: the drop-in goes first, then the gateway restarts, and the
+// The next step of "Remove access", always in this order: the drop-in goes first, then the gateway restarts, and the
 // key goes only once the running gateway has no variable and no drop-in points at it.
 export function nextRemovalStep({ probe, unit }) {
   if (!probe || !unit) return "done";

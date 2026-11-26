@@ -3,8 +3,8 @@
 // Notifications and Connection, then the links, and Cancel / Save at the bottom. Save writes the changed keys to
 // hermes-kanban.json; the panel and the watcher read it again (shared "hermes-kanban.config").
 // The dialog edits the instance the panel showed when it opened (props.machine), also when the focus moves on:
-// single agent mode for it, its default agent (read only, from /orchestration) and "Remove access" in the spec's
-// order (lib/setup.js nextRemovalStep): the drop-in first, then a restart only on a click, the key last.
+// single agent mode for it, its default agent (read only, from /orchestration) and "Remove access" in its
+// fixed order (lib/setup.js nextRemovalStep): the drop-in first, then a restart only on a click, the key last.
 // Layout and controls adapted from ghchecker by Michael Mayer (MIT), mods/ghchecker/settings.js, itself from
 // filer-pro (MIT), mods/filer-pro/ui/settings.js.
 import { div } from "gpui-kit";
@@ -67,7 +67,8 @@ export class SettingsDialog {
       if (problems.includes(CONFIG_FILE)) { this.broken = true; this.error = `${CONFIG_FILE} has a typo: fix or delete it, then reopen Settings.`; }
       cx.notify();
     });
-    // The settings probe for "Remove access" themselves: the poller probes only on trouble (R6).
+    // The settings probe for "Remove access" themselves: the poller probes only on trouble, so
+    // its access state cannot tell whether a drop-in or a key is still there.
     if (machine && this.mode === "gated") this.probe(cx);
     this.handle.focus();
   }

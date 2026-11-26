@@ -1,10 +1,10 @@
 // Access to a gated Hermes in the panel: the empty state of each access state (lib/setup.js ACCESS_TEXT) and the flow
-// of "Set up access" (spec "Setup und Entfernen"). The button first shows the steps and asks for "Confirm"; then a
+// of "Set up access". The button first shows the steps and asks for "Confirm"; then a
 // fresh probe, the gateway unit, SETUP_SCRIPT on the machine, and "waiting for restart". Only a click on "Restart
 // gateway" runs `hermes gateway restart`; after it the panel waits for /api/status to say running, checks /stats with
 // the key, and asks the watcher for a new poll. An open instance (no auth gate) gets no setup and no restart.
 // Each flow belongs to the machine of its first click and stays there, also when the panel follows another pane
-// meanwhile (R18). The runners below are also the settings' (settings.js, "Remove access").
+// meanwhile. The runners below are also the settings' (settings.js, "Remove access").
 import { div } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { exec, shared, setShared } from "herdr";

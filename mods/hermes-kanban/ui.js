@@ -82,7 +82,7 @@ export function button(id, label, t, onClick, opts = {}) {
 export const pill = (label, color) => h_flex().flex_none().h(24).px(10).items_center().rounded(12).bg(alpha(color, "2e"))
   .text_size(12).font_medium().text_color(color).child(label);
 
-// The priority chip of a row: a quiet outline, as in the mockup.
+// The priority chip of a row: a quiet outline, not a filled badge.
 export const chip = (label, t) => h_flex().h(18).px(6).flex_none().items_center().rounded(9).border_1().border_color(t.border)
   .text_size(11).text_color(t.muted).child(label);
 
