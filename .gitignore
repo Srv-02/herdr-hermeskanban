@@ -1,0 +1,10 @@
+tmp/
+build/
+node_modules/
+.superpowers/
+herdr.d.ts
+gpui-kit.d.ts
+jsconfig.json
+.DS_Store
+docs/superpowers/
+HANDOVER.md
