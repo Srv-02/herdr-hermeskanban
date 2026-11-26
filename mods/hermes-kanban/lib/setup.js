@@ -150,3 +150,64 @@ export function accessState({ status, probe, statsCode }) {
   if (!probe.token && !probe.python3) return out("no_python");
   return out("needs_setup");
 }
+
+// ---- the flow in the panel (access.js) and in the settings (settings.js) ----
+
+// What "Set up access" does, shown before it runs (spec "Setup und Entfernen", steps 1-5).
+export const SETUP_STEPS = [
+  `Create a key, only if it is missing: umask 077 and Hermes' own generator, python3 -c "import secrets; print(secrets.token_urlsafe(32))", into ~/${TOKEN_FILES.gated}.`,
+  `Add a drop-in for the gateway's systemd unit, mode 0600, at ~/.config/systemd/user/<gateway unit>.d/${DROPIN_NAME} (the unit is found on the machine):\n${DROPIN_TEXT.trim()}`,
+  "Run systemctl --user daemon-reload.",
+  "No automatic restart: the gateway picks the key up only after you click \"Restart gateway\".",
+  "Check that GET /api/plugins/kanban/stats with the key answers 200.",
+];
+
+// The state of access (accessState) in words, for the panel's empty state and the settings.
+export const ACCESS_TEXT = {
+  gateway_down: { title: "Gateway down", body: "The Hermes gateway on this machine does not answer. The board comes back when it runs again." },
+  needs_setup: { title: "Access not set up", body: "This Hermes signs people in. Hermes Kanban needs a key of its own on this machine; the key never leaves it." },
+  waiting_restart: { title: "Waiting for restart", body: "Restart the gateway to finish. Telegram pauses briefly, running turns finish first." },
+  token_rejected: { title: "The gateway refuses the key", body: "The gateway runs with the key of Hermes Kanban and still answers 401. Remove access in the settings, then set it up again." },
+  // Two causes end here: ~/.hermes not readable (exec runs as another user), or no single gateway unit.
+  wrong_user: { title: "Can't set up access here", body: "Either herdr runs on this machine as another user than the Hermes gateway, or systemd lists no single gateway unit (none, or several hermes-gateway units). Hermes Kanban sets up access only for one gateway of its own user." },
+  curl_old: { title: "curl is too old", body: "Hermes Kanban needs curl 7.55 or newer on this machine." },
+  no_python: { title: "No python3 for the key", body: "Hermes Kanban makes its key with python3, and this machine has none. Install python3, then try again." },
+  open_rejected: { title: "Hermes refused access", body: "This Hermes runs without sign-in. Hermes Kanban uses the web app's own token there, and the gateway refused it. There is nothing to set up for such an instance." },
+};
+
+// The button the panel offers for a state: "setup", "restart" or none. Only a gated instance gets either; an open
+// one (no auth gate) needs no setup and no restart.
+export function accessOffer({ state, mode }) {
+  if (mode !== "gated") return null;
+  return { needs_setup: "setup", waiting_restart: "restart" }[state] ?? null;
+}
+
+// The unit to set up, or why not: checked on a fresh probe before anything is written.
+export function setupUnit(probe) {
+  if (!probe) return { error: "Could not read the machine." };
+  if (!probe.home) return { error: ACCESS_TEXT.wrong_user.body };
+  if (!curlOk(probe.curl)) return { error: ACCESS_TEXT.curl_old.body };
+  if (!probe.token && !probe.python3) return { error: ACCESS_TEXT.no_python.body };
+  const picked = pickUnit(probe.units);
+  return picked.unit ? { unit: picked.unit } : { error: ACCESS_TEXT.wrong_user.body };
+}
+
+// The next step of "Remove access", in the spec's order: the drop-in goes first, then the gateway restarts, and the
+// key goes only once the running gateway has no variable and no drop-in points at it.
+export function nextRemovalStep({ probe, unit }) {
+  if (!probe || !unit) return "done";
+  if (probe.dropins.includes(unit)) return "remove_dropin";
+  if (probe.runningEnv[unit] !== false) return probe.token || probe.runningEnv[unit] === true ? "offer_restart" : "done";
+  return probe.token ? "delete_token" : "done";
+}
+
+// The exit code of SETUP_SCRIPT, REMOVE_SCRIPT ("remove") or DELETE_TOKEN_SCRIPT ("delete_token") in words; null for 0.
+export function scriptError(name, code) {
+  if (code === 0) return null;
+  if (code === 2) return "The gateway's unit name looks wrong; nothing was changed.";
+  if (name === "setup" && code === 5) return "~/.hermes is not readable: herdr runs on this machine as another user than the gateway.";
+  if (name === "setup" && code === 6) return "Could not make the key with python3.";
+  if (name === "delete_token" && code === 3) return "The key stays: the drop-in still points at it.";
+  if (name === "delete_token" && code === 4) return "The key stays: the running gateway still reads it. Restart the gateway first.";
+  return `The step failed (exit ${code}).`;
+}

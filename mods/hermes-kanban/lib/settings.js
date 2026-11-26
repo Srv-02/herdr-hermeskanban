@@ -16,7 +16,7 @@ export const SETTINGS = [
   { key: "toast.done", type: "boolean", default: true, label: "Toast when a task is done",
     about: "A toast when a task finishes." },
   { key: "sound.needs_you", type: "boolean", default: true, label: "Sound when a task needs you",
-    about: "A sound with the toast for a blocked task or one waiting for review." },
+    about: "A sound with the toast for a blocked task, one waiting for review, or a failed one." },
   { key: "sound.done", type: "boolean", default: false, label: "Sound when a task is done",
     about: "A sound when a task finishes." },
   { key: "badge", type: "boolean", default: false, label: "Dock badge",

@@ -11,6 +11,8 @@ import { spaces, panes, focused, layout, theme, openOverlay, closeOverlay, props
 import { watchPass } from "./watcher.js";
 import { TaskViewer } from "./viewer.js";
 import { CreateDialog } from "./create.js";
+import { SettingsDialog } from "./settings.js";
+import { Access } from "./access.js";
 import { tones, alpha, glyph, glyphOf, segmented, chip, blankslate, look, GOLD } from "./ui.js";
 import { dotOf, boardsOf } from "./lib/changes.js";
 import { loadSettings, defaults, isSingleAgent } from "./lib/settings.js";
@@ -68,14 +70,15 @@ export default class HermesKanban extends View {
     // The task overlay (viewer.js) and the new task (create.js) take their machine from the props, never the focus.
     if (p.task) { this.viewer = new TaskViewer(p.task, p.overlay, cx); return; }
     if (p.create) { this.creator = new CreateDialog(p.create, p.overlay, cx); return; }
-    // The settings dialog comes in its own step; until then a plain note.
-    if (p.settings) { this.later = true; return; }
+    // The settings edit the instance in their props (the one the panel showed), never the focus.
+    if (p.settings) { this.dialog = new SettingsDialog(p, p.overlay, cx); return; }
     this.panel(cx);
   }
 
   // ---- the panel ----
   panel(cx) {
     this.settings = defaults(); // hermes-kanban.json, read at start and after Save in the settings
+    this.access = new Access(); // the flows of "Set up access", one per machine (access.js)
     this.f = { ...FILTERS, ...remembered("filters", {}) };
     this.filtering = remembered("filtering", false);
     this.query = "";
@@ -432,7 +435,7 @@ export default class HermesKanban extends View {
     if (this.menu) return this.renderMenu(t);
     if (this.viewer) return this.viewer.render(cx);
     if (this.creator) return this.creator.render(cx);
-    if (this.later) return this.shell(t).child(blankslate(t, { title: "Not available yet" }));
+    if (this.dialog) return this.dialog.render(cx);
 
     this.drawnAt = Date.now();
     if (hidden()) { this.away = true; return this.shell(t); }
@@ -470,9 +473,10 @@ export default class HermesKanban extends View {
       return shell.child(blankslate(t, { icon: "alert", title: snap.unsupported, body: "Its board answers in a shape this version of Hermes Kanban does not know." }))
         .child(this.statusBar(t, c, snap));
     }
-    // Access to set up or fix (Task 12 draws the steps). A gateway that went down keeps its last board.
-    if (access !== "ok" && access !== "unknown" && !(access === "gateway_down" && snap.board)) {
-      return shell.child(blankslate(t, { icon: "alert", title: "No access to this board", body: `Access: ${access}` }));
+    // Access to set up or fix, or a setup running on this machine (access.js). A gateway that went down keeps its last
+    // board, unless its restart is one this panel asked for.
+    if (this.access.showing(focus.machine, snap) || (access !== "ok" && access !== "unknown" && !(access === "gateway_down" && snap.board))) {
+      return shell.child(this.access.draw(t, c, focus.machine, snap));
     }
     if (!snap.board) {
       return shell.child(blankslate(t, snap.error ? { icon: "alert", title: "Can't read the board", body: snap.error }

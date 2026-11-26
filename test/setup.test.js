@@ -6,7 +6,8 @@ import path from "node:path";
 import { mkTmpSync } from "./tmp-helper.js";
 import {
   DELETE_TOKEN_SCRIPT, DROPIN_NAME, DROPIN_TEXT, PROBE_SCRIPT, REMOVE_SCRIPT, SETUP_SCRIPT, UNIT_RE,
-  accessState, curlOk, parseProbe, pickUnit, restartSpec, scriptSpec,
+  ACCESS_TEXT, SETUP_STEPS, accessOffer, accessState, curlOk, nextRemovalStep, parseProbe, pickUnit, restartSpec, scriptError,
+  scriptSpec, setupUnit,
 } from "../mods/hermes-kanban/lib/setup.js";
 
 const UNIT = "hermes-gateway.service";
@@ -212,4 +213,92 @@ test("scriptSpec and restartSpec bind to the machine", () => {
   assert.equal(scriptSpec("devbox", SETUP_SCRIPT, ["hermes-gateway.service"]).opts.on, "devbox");
   assert.deepEqual(scriptSpec("devbox", SETUP_SCRIPT, [UNIT], 5000), { cmd: "sh", args: ["-c", SETUP_SCRIPT, "sh", UNIT], opts: { on: "devbox", timeout: 5000 } });
   assert.deepEqual(restartSpec("labbox"), { cmd: "hermes", args: ["gateway", "restart"], opts: { on: "labbox", timeout: 600000 } });
+});
+
+// ---- the flow in the panel and the settings (Task 12) ----
+
+test("SETUP_STEPS name the drop-in path and say there is no automatic restart", () => {
+  assert.equal(SETUP_STEPS.length, 5);
+  const [key, dropin, reload, restart, verify] = SETUP_STEPS;
+  assert.match(key, /only if (it is )?missing/i);
+  assert.match(key, /~\/\.hermes\/dashboard\.token/);
+  assert.match(key, /umask 077/);
+  assert.match(key, /secrets\.token_urlsafe\(32\)/);
+  assert.ok(dropin.includes(`~/.config/systemd/user/<gateway unit>.d/${DROPIN_NAME}`), dropin);
+  assert.ok(dropin.includes(DROPIN_TEXT.trim()), "the drop-in's whole content");
+  assert.match(dropin, /0600/);
+  assert.match(reload, /systemctl --user daemon-reload/);
+  assert.match(restart, /No automatic restart/);
+  assert.match(restart, /Restart gateway/);
+  assert.match(verify, /GET \/api\/plugins\/kanban\/stats/);
+  assert.match(verify, /200/);
+});
+
+test("nextRemovalStep: drop-in first, restart second, token last", () => {
+  const unit = "hermes-gateway.service";
+  assert.equal(nextRemovalStep({ unit, probe: { dropins: [unit], runningEnv: { [unit]: true }, token: true } }), "remove_dropin");
+  assert.equal(nextRemovalStep({ unit, probe: { dropins: [], runningEnv: { [unit]: true }, token: true } }), "offer_restart");
+  assert.equal(nextRemovalStep({ unit, probe: { dropins: [], runningEnv: { [unit]: false }, token: true } }), "delete_token");
+  assert.equal(nextRemovalStep({ unit, probe: { dropins: [], runningEnv: { [unit]: false }, token: false } }), "done");
+});
+
+test("nextRemovalStep never offers the key while the drop-in exists or the gateway may still read it", () => {
+  const unit = UNIT;
+  // The drop-in wins even when the gateway runs without the variable.
+  assert.equal(nextRemovalStep({ unit, probe: { dropins: [unit], runningEnv: { [unit]: false }, token: true } }), "remove_dropin");
+  // Unknown environment (no line for the unit): restart, never delete.
+  assert.equal(nextRemovalStep({ unit, probe: { dropins: [], runningEnv: {}, token: true } }), "offer_restart");
+  // A gateway that still has the variable, key already gone: restart it.
+  assert.equal(nextRemovalStep({ unit, probe: { dropins: [], runningEnv: { [unit]: true }, token: false } }), "offer_restart");
+  // Another unit's drop-in does not count for this one.
+  assert.equal(nextRemovalStep({ unit, probe: { dropins: ["hermes-gateway-x.service"], runningEnv: { [unit]: false }, token: true } }), "delete_token");
+  // No unit or no probe: nothing can be removed safely.
+  assert.equal(nextRemovalStep({ unit: undefined, probe: { dropins: [], runningEnv: {}, token: true } }), "done");
+  assert.equal(nextRemovalStep({ unit, probe: null }), "done");
+});
+
+test("ACCESS_TEXT has a title and a body for every state accessState gives", () => {
+  const states = ["gateway_down", "wrong_user", "curl_old", "open_rejected", "needs_setup", "waiting_restart", "token_rejected", "no_python"];
+  for (const s of states) {
+    assert.equal(typeof ACCESS_TEXT[s]?.title, "string", s);
+    assert.ok(ACCESS_TEXT[s].title.length > 3, s);
+    assert.ok(ACCESS_TEXT[s].body.length > 10, s);
+  }
+  assert.equal(ACCESS_TEXT.waiting_restart.body, "Restart the gateway to finish. Telegram pauses briefly, running turns finish first.");
+  assert.equal(ACCESS_TEXT.needs_setup.title, "Access not set up");
+  // wrong_user stands for two causes: herdr runs as another user, or there is no single gateway unit.
+  assert.match(ACCESS_TEXT.wrong_user.body, /another user/);
+  assert.match(ACCESS_TEXT.wrong_user.body, /several/);
+  assert.match(ACCESS_TEXT.curl_old.body, /7\.55/);
+  assert.match(ACCESS_TEXT.no_python.body, /python3/);
+});
+
+test("accessOffer: setup and restart only on a gated instance", () => {
+  assert.equal(accessOffer({ state: "needs_setup", mode: "gated" }), "setup");
+  assert.equal(accessOffer({ state: "waiting_restart", mode: "gated" }), "restart");
+  for (const state of ["needs_setup", "waiting_restart", "open_rejected", "ok"]) assert.equal(accessOffer({ state, mode: "open" }), null, state);
+  for (const state of ["needs_setup", "waiting_restart"]) assert.equal(accessOffer({ state, mode: null }), null, state);
+  for (const state of ["ok", "gateway_down", "wrong_user", "curl_old", "token_rejected", "no_python", "unknown"]) assert.equal(accessOffer({ state, mode: "gated" }), null, state);
+});
+
+test("setupUnit checks the machine before any write", () => {
+  const p = (over = {}) => ({ home: true, units: [UNIT], curl: "8.18.0", python3: true, token: false, dropins: [], runningEnv: {}, ...over });
+  assert.deepEqual(setupUnit(p()), { unit: UNIT });
+  assert.deepEqual(setupUnit(p({ python3: false, token: true })), { unit: UNIT });
+  assert.equal(setupUnit(null).error, "Could not read the machine.");
+  assert.equal(setupUnit(p({ home: false })).error, ACCESS_TEXT.wrong_user.body);
+  assert.equal(setupUnit(p({ units: [] })).error, ACCESS_TEXT.wrong_user.body);
+  assert.equal(setupUnit(p({ units: ["hermes-gateway-a.service", "hermes-gateway-b.service"] })).error, ACCESS_TEXT.wrong_user.body);
+  assert.equal(setupUnit(p({ curl: "7.50.1" })).error, ACCESS_TEXT.curl_old.body);
+  assert.equal(setupUnit(p({ python3: false })).error, ACCESS_TEXT.no_python.body);
+});
+
+test("scriptError explains the exit codes of the scripts", () => {
+  assert.equal(scriptError("setup", 0), null);
+  assert.match(scriptError("setup", 2), /unit name/);
+  assert.match(scriptError("setup", 5), /another user/);
+  assert.match(scriptError("setup", 6), /key/);
+  assert.match(scriptError("delete_token", 3), /drop-in/);
+  assert.match(scriptError("delete_token", 4), /restart/i);
+  assert.match(scriptError("remove", 1), /exit 1/);
 });

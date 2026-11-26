@@ -225,3 +225,102 @@ test("the overlay draws the description as plain text", () => {
   assert.equal([...all.matchAll(/TextView\.html\(/g)].length, 1, "one text view, fed by plainHtml");
   assert.match(source("ui.js"), /export function openUrl\(url\) \{\s*if \(!safeLink\(url\)\) return;/);
 });
+
+// ---- access and the settings dialog ----
+
+// R25: the settings footer as ghchecker's.
+test("the settings footer links GitHub and Buy me a coffee", () => {
+  const src = source("settings.js");
+  assert.match(src, /import \{[^}]*\bGITHUB_URL\b[^}]*\} from "\.\/lib\/update\.js"/);
+  assert.match(src, /import \{[^}]*\bCOFFEE_URL\b[^}]*\} from "\.\/lib\/update\.js"/);
+  assert.match(src, /"Hermes Kanban is free and open source\."/);
+  assert.match(src, /link\(t, "settings-github", "GitHub", glyph\("github", 14, t\.muted\), GITHUB_URL\)/);
+  assert.match(src, /link\(t, "settings-coffee", "Buy me a coffee", glyph\("coffee", 14, t\.muted\), COFFEE_URL\)/);
+});
+
+// Where each .on_click( handler of `src` (blanked code) opens and closes.
+function clickHandlers(src) {
+  const spans = [];
+  for (const m of src.matchAll(/\.on_click\(/g)) {
+    let depth = 1, i = m.index + m[0].length;
+    for (; i < src.length && depth > 0; i++) if (src[i] === "(") depth++; else if (src[i] === ")") depth--;
+    spans.push([m.index, i]);
+  }
+  return spans;
+}
+
+test("clickHandlers finds the span of each handler", () => {
+  const src = "a.on_click(() => f(g(1))).x(restartSpec(m)); b.on_click((e) => { restartSpec(m); })";
+  const spans = clickHandlers(src), at = [...src.matchAll(/restartSpec\(/g)].map((m) => m.index);
+  const inside = at.map((i) => spans.some(([a, b]) => i > a && i < b));
+  assert.deepEqual(inside, [false, true]);
+});
+
+// Spec: no automatic restart. The restart's spec is built only inside a click handler, and only in the two files that
+// offer the button.
+test("the mod never restarts without a click", () => {
+  const files = fs.readdirSync(dir, { recursive: true }).filter((f) => f.endsWith(".js") && f !== path.join("lib", "setup.js"));
+  const users = files.filter((f) => /\brestartSpec\b/.test(code(f))).sort();
+  assert.deepEqual(users, ["access.js", "settings.js"]);
+  for (const f of users) {
+    const src = code(f), spans = clickHandlers(src), at = [...src.matchAll(/\brestartSpec\(/g)].map((m) => m.index);
+    assert.ok(at.length > 0, `${f} builds the restart`);
+    for (const i of at) assert.ok(spans.some(([a, b]) => i > a && i < b), `${f}: restartSpec( outside a click handler at ${i}`);
+  }
+  // Nothing else names the hermes CLI.
+  for (const f of files) assert.doesNotMatch(source(f), /"gateway", "restart"/, f);
+});
+
+// R18: setup, restart and removal stay on the machine of the first click; they never read the focus.
+test("access and settings bind their machine and never read the focus", () => {
+  for (const f of ["access.js", "settings.js"]) {
+    const src = code(f);
+    assert.doesNotMatch(src, /\bfocused\(/, `${f} reads no focus`);
+    assert.doesNotMatch(src, /\bspaces\(/, `${f} reads no spaces`);
+    assert.doesNotMatch(src, /\bpanes\(/, `${f} reads no panes`);
+    assert.match(src, /this\.machine = machine;/, `${f} binds its machine`);
+  }
+  // The panel keeps one flow per machine, made at the first click with the machine it showed then.
+  assert.match(source("access.js"), /flow\(machine\) \{/);
+  assert.match(code("main.js"), /this\.access\.draw\(t, c, focus\.machine, snap\)/);
+});
+
+test("setup asks first, then runs; removal keeps the order", () => {
+  const access = source("access.js"), settings = source("settings.js");
+  assert.match(access, /"Set up access"/);
+  assert.match(access, /"Confirm"/);
+  assert.match(access, /"Restart gateway"/);
+  assert.match(access, /SETUP_STEPS/);
+  assert.match(access, /accessOffer\(/);
+  assert.match(access, /setupUnit\(/);
+  assert.match(access, /SETUP_SCRIPT/);
+  assert.match(settings, /nextRemovalStep\(/);
+  assert.match(settings, /REMOVE_SCRIPT/);
+  assert.match(settings, /DELETE_TOKEN_SCRIPT/);
+  assert.match(settings, /"Remove access"/);
+  // Output from the machine is shown only through redactSecrets.
+  for (const src of [access, settings]) assert.match(src, /redactSecrets\(/);
+});
+
+test("main.js opens the settings dialog with its props", () => {
+  const src = code("main.js");
+  assert.match(src, /if \(p\.settings\) \{ this\.dialog = new SettingsDialog\(p, p\.overlay, cx\); return; \}/);
+  assert.doesNotMatch(source("main.js"), /Not available yet/);
+});
+
+test("the settings dialog is ghchecker's", () => {
+  const src = source("settings.js");
+  assert.match(src, /"Hermes settings"/);
+  assert.match(src, /child\("Esc"\)/);
+  assert.match(src, /\.bg\(t\.popover\)/);
+  assert.match(src, /text_size\(17\)/);
+  assert.match(src, /w\(42\)\.h\(24\)/);
+  assert.match(src, /py\(13\)/);
+  for (const h of ["Updates", "Agents", "Display", "Notifications", "Connection"]) assert.match(src, new RegExp(`heading\\(t, "${h}"`), h);
+  assert.match(src, /"Without a default agent, a new task does not start\."/);
+  assert.match(src, /setShared\("hermes-kanban\.config", \{ at: Date\.now\(\) \}\)/);
+  assert.match(src, /changedSettings\(/);
+  assert.match(src, /UPDATE_PROMPT/);
+  assert.match(src, /releaseUrl|status\.url/);
+  assert.match(code("settings.js"), /if \(checking\(\)\) return;/);
+});

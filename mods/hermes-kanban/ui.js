@@ -57,8 +57,9 @@ export function segmented(id, items, value, t, onPick) {
 }
 
 // Buttons as ghchecker's: default (bordered), primary (the theme's accent), filled with a tone color (Comment &
-// unblock, Confirm archive), outlined in a tone (Archive).
-export function button(id, label, t, onClick, { primary = false, tone = null, outline = null, enabled = true, icon: name = null, small = false, tooltip = null } = {}) {
+// unblock, Confirm archive), outlined in a tone (Archive). buttonFace is the button without its handler, for a click
+// that must be written out where it is drawn (the gateway restart, rows.test.js).
+export function buttonFace(id, label, t, { primary = false, tone = null, outline = null, enabled = true, icon: name = null, small = false, tooltip = null } = {}) {
   const fill = enabled ? (tone ?? (primary ? t.accent : null)) : null, h = small ? 26 : 30;
   const ink = fill ? (tone ? t.background : t.accent_foreground ?? t.background) : enabled ? (outline ?? t.foreground) : t.dim;
   return h_flex().id(id).h(h).px(label === "" ? (small ? 6 : 8) : (small ? 10 : 12)).gap(6).flex_none().items_center().justify_center().rounded(7)
@@ -66,10 +67,13 @@ export function button(id, label, t, onClick, { primary = false, tone = null, ou
     .bg(fill ?? CLEAR).border_1().border_color(fill ?? t.border)
     .text_color(ink)
     .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
-    .when(enabled, (e) => e.cursor_pointer().hover((s) => s.bg(fill ? alpha(fill, "dd") : t.hover)).on_click(onClick))
+    .when(enabled, (e) => e.cursor_pointer().hover((s) => s.bg(fill ? alpha(fill, "dd") : t.hover)))
     .when(Boolean(tooltip), (e) => e.tooltip(tooltip))
     .when(Boolean(name), (e) => e.child(glyph(name, 14, ink)))
     .when(label !== "", (e) => e.child(label));
+}
+export function button(id, label, t, onClick, opts = {}) {
+  return buttonFace(id, label, t, opts).when(opts.enabled !== false, (e) => e.on_click(onClick));
 }
 
 // A pill filled with a tint of the color: the status in the overlay's head.
