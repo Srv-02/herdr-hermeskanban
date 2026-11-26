@@ -337,7 +337,7 @@ test("the settings dialog is ghchecker's", () => {
   assert.match(src, /w\(42\)\.h\(24\)/);
   assert.match(src, /py\(13\)/);
   for (const h of ["Updates", "Agents", "Display", "Notifications", "Connection"]) assert.match(src, new RegExp(`heading\\(t, "${h}"`), h);
-  assert.match(src, /tasks from Telegram or the CLI without an agent do not start/);
+  assert.match(src, /tasks from chat or the CLI without an agent do not start/);
   assert.match(src, /setShared\("hermes-kanban\.config", \{ at: Date\.now\(\) \}\)/);
   assert.match(src, /changedSettings\(/);
   assert.match(src, /UPDATE_PROMPT/);
@@ -398,4 +398,14 @@ test("the new task dialog sizes to its content", () => {
   assert.match(main, /openCreate\(machine\) \{\n    openOverlay\(\{ mod: MOD, kind: "dialog", modal: true, frame: "none", width: 560, props: \{ create: \{ machine \} \} \}\);/);
   assert.match(create, /this\.body\.set_auto_grow\(8, 14\)/);
   assert.doesNotMatch(create, /id\("create"\)\.size_full\(\)/);
+});
+
+// The repo is public: the mod's texts name no particular messaging product.
+test("no messaging product is named in the mod", () => {
+  const files = [...fs.readdirSync(dir).filter((f) => f.endsWith(".js")), ...fs.readdirSync(path.join(dir, "lib")).map((f) => `lib/${f}`)];
+  assert.deepEqual(files.filter((f) => /telegram/i.test(source(f))), []);
+});
+
+test("single agent mode's help says the mod gives new tasks to the default agent", () => {
+  assert.match(source("settings.js"), /New tasks from this panel go to its default agent/);
 });

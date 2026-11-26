@@ -157,7 +157,7 @@ The `+` in the header opens `New task` on the instance the panel shows; the dial
   - A click on a toast jumps to that instance's Hermes pane (the one focused last, else the first one, else any pane of a space on that machine); the panel follows by itself.
 - **The dot** on the `Hermes` button, over all visible instances: red and glowing for something new that needs you (needs you or failed), green for a task newly done, nothing else. It shows only what you have not seen: opening the panel on an instance clears its part, and the instance the panel shows collects nothing. A task that just stays blocked, or an agent that runs, adds nothing. No count.
 - **Other instances:** in the panel, a red strip `labbox needs you` with `Go to pane →` for each other visible instance with unseen news that needs you.
-- **Sounds:** Herdr's `blocked` sound for needs you and failed, its `done` sound for done; at most one per poll. **Dock badge:** the number of unseen events that need you.
+- **Sounds:** Herdr's `blocked` sound for needs you and failed, its `done` sound for done; at most one per poll. **Dock badge:** a dot on the Herdr icon while something that needs you is unseen; no number.
 - Each has its own switch in the [settings](#settings).
 
 ## Access
@@ -205,7 +205,7 @@ For an instance with one agent. Switch it on in the settings while the panel sho
 
 - The agent filter, the agent picker and the grouping by agent disappear; agent names are hidden in the rows, the overlay, the activity and the toasts. Texts name the instance instead: `devbox needs you`, `devbox: task finished`.
 - The search no longer looks at agent names.
-- New tasks go to the instance's default agent.
+- New tasks from this panel go to the instance's default agent (Hermes Kanban assigns it when it creates the task).
 - **Default agent** (read only, shown under the switch): the one Hermes resolves, `kanban.default_assignee`, else its active profile. When `kanban.default_assignee` is not set, the row warns: tasks created without an agent elsewhere (from Hermes' messaging channels or its CLI) do not start. Tasks from this panel still go to the default agent.
 
 ## Keys
@@ -232,7 +232,7 @@ The gear at the right of the header opens the Settings dialog; **Save** writes t
 | `toast.done` | Toast when a task is done | true / false | `true` | A toast when a task finishes. |
 | `sound.needs_you` | Sound when a task needs you | true / false | `true` | Herdr's `blocked` sound with a needs-you or failed change. |
 | `sound.done` | Sound when a task is done | true / false | `false` | Herdr's `done` sound when a task finishes. |
-| `badge` | Dock badge | true / false | `false` | The number of unseen events that need you on the Herdr icon in the Dock. |
+| `badge` | Dock badge | true / false | `false` | A dot (`•`) on the Herdr icon in the Dock while something that needs you is unseen. No number. |
 | `poll_seconds` | Check every | `15` / `30` / `60` / `120` | `30` | Seconds between two cheap checks of each visible instance. The board is read only when it changed. |
 | `update_check` | Check for updates automatically | true / false | `true` | Once a day, asks GitHub whether a new version exists. Nothing about you or your boards is sent, but GitHub sees your IP address. |
 

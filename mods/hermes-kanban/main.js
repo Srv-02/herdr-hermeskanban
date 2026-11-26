@@ -92,7 +92,7 @@ export default class HermesKanban extends View {
     this.readSettings(cx);
     readTextFile(`${appHome()}/mods/hermes-kanban/mod.json`).then((text) => { this.version = localVersion(text); cx.notify(); }, () => null);
     cx.timer.every(TICK, (cx) => this.tick(cx));
-    // keys.json: "alt-h r": "hermes-kanban:refresh", or filter (show or hide the filter bar), settings, new (a new task
+    // keys.json: "alt-h r": "hermes-kanban:refresh", or filter (show or hide the second filter row: priority and grouping), settings, new (a new task
     // on the shown instance), open (the first row).
     cx.spawn(async (cx) => {
       for (;;) {

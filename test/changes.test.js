@@ -135,8 +135,9 @@ test("needsYou: only an unseen needs-you event of that machine", () => {
   assert.equal(needsYou({}, "devbox"), false);
 });
 
-test("badgeOf: the number of unseen needs-you events, else nothing", () => {
-  assert.equal(badgeOf({ devbox: { needs: 2, done: 1 }, labbox: { needs: 1, done: 0 } }), "3");
+test("badgeOf: one marker without a number while a needs-you event is unseen, else nothing", () => {
+  assert.equal(badgeOf({ devbox: { needs: 2, done: 1 }, labbox: { needs: 1, done: 0 } }), "•");
+  assert.equal(badgeOf({ devbox: { needs: 1, done: 0 } }), "•");
   assert.equal(badgeOf({ devbox: { needs: 0, done: 4 } }), null);
   assert.equal(badgeOf({}), null);
 });

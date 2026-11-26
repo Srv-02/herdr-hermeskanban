@@ -180,7 +180,7 @@ export class Access {
         error]);
     }
     if (phase === "setting_up") return box("running", `Setting up access on ${machine}…`, ["Writing the key and the drop-in, then systemctl --user daemon-reload."]);
-    if (phase === "restarting") return box("running", `Restarting the gateway on ${machine}…`, ["Running turns finish first; Telegram pauses briefly."]);
+    if (phase === "restarting") return box("running", `Restarting the gateway on ${machine}…`, ["Running turns finish first; messaging pauses briefly."]);
     if (phase === "verifying") return box("running", "Checking access…", ["GET /api/plugins/kanban/stats with the key."]);
     if (phase === "done") return box("check-circle", "Access works", ["Reading the board…"], c.green);
     if (phase === "restart") {

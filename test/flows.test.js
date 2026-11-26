@@ -352,11 +352,11 @@ test("new task: an explicit None stays unassigned, and the hint tells", async ()
   assert.match(draw(() => d2.render(cx)).text, /Without an agent; Hermes gives it to default at the next dispatch\./);
 });
 
-// The settings warn only while kanban.default_assignee is not configured: tasks from Telegram or the CLI then do not start.
-test("settings: the warning names Telegram and the CLI, only without kanban.default_assignee", async () => {
+// The settings warn only while kanban.default_assignee is not configured: tasks from chat or the CLI then do not start.
+test("settings: the warning names chat and the CLI, only without kanban.default_assignee", async () => {
   machine({ dropin: true, env: true, token: true, gated: true });
   const cx = fakeCx();
-  const WARN = /kanban\.default_assignee is not set: tasks from Telegram or the CLI without an agent do not start\. Tasks from this panel go to default\./;
+  const WARN = /kanban\.default_assignee is not set: tasks from chat or the CLI without an agent do not start\. Tasks from this panel go to default\./;
   herdr.store["hermes-kanban.boards"] = { devbox: { machine: "devbox", mode: "gated", hermes: true, defaultAssignee: "", resolvedAssignee: "default" } };
   let d = new SettingsDialog({ settings: true, machine: "devbox" }, "overlay", cx);
   await cx.settle();
@@ -364,5 +364,5 @@ test("settings: the warning names Telegram and the CLI, only without kanban.defa
   herdr.store["hermes-kanban.boards"].devbox.defaultAssignee = "default";
   d = new SettingsDialog({ settings: true, machine: "devbox" }, "overlay", cx);
   await cx.settle();
-  assert.doesNotMatch(draw(() => d.render(cx)).text, /Telegram/);
+  assert.doesNotMatch(draw(() => d.render(cx)).text, /kanban\.default_assignee is not set/);
 });

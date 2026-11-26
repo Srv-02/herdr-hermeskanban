@@ -20,7 +20,7 @@ export const SETTINGS = [
   { key: "sound.done", type: "boolean", default: false, label: "Sound when a task is done",
     about: "A sound when a task finishes." },
   { key: "badge", type: "boolean", default: false, label: "Dock badge",
-    about: "The number of tasks that need you on the herdr icon in the Dock." },
+    about: "A dot on the herdr icon in the Dock while something that needs you is unseen. No number." },
   { key: "poll_seconds", type: "choice", choices: [15, 30, 60, 120], default: 30, label: "Check every",
     about: "Seconds between two cheap checks of each visible instance. The board is fetched only when it changed." },
   { key: "update_check", type: "boolean", default: true, label: "Check for updates automatically",

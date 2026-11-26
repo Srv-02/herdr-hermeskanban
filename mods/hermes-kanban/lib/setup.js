@@ -176,7 +176,7 @@ export const SETUP_STEPS = [
 export const ACCESS_TEXT = {
   gateway_down: { title: "Gateway down", body: "The Hermes gateway on this machine does not answer. The board comes back when it runs again." },
   needs_setup: { title: "Access not set up", body: "This Hermes signs people in. Hermes Kanban needs a key of its own on this machine; the key never leaves it." },
-  waiting_restart: { title: "Waiting for restart", body: "Restart the gateway to finish. Telegram pauses briefly, running turns finish first." },
+  waiting_restart: { title: "Waiting for restart", body: "Restart the gateway to finish. Messaging pauses briefly, running turns finish first." },
   token_rejected: { title: "The gateway refuses the key", body: "The gateway runs with the key of Hermes Kanban and still answers 401. Remove access in the settings, then set it up again." },
   // Two causes end here: ~/.hermes not readable (exec runs as another user), or no single gateway unit.
   wrong_user: { title: "Can't set up access here", body: "Either herdr runs on this machine as another user than the Hermes gateway, or systemd lists no single gateway unit (none, or several hermes-gateway units). Hermes Kanban sets up access only for one gateway of its own user." },

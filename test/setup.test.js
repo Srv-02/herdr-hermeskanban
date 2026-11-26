@@ -264,7 +264,7 @@ test("ACCESS_TEXT has a title and a body for every state accessState gives", () 
     assert.ok(ACCESS_TEXT[s].title.length > 3, s);
     assert.ok(ACCESS_TEXT[s].body.length > 10, s);
   }
-  assert.equal(ACCESS_TEXT.waiting_restart.body, "Restart the gateway to finish. Telegram pauses briefly, running turns finish first.");
+  assert.equal(ACCESS_TEXT.waiting_restart.body, "Restart the gateway to finish. Messaging pauses briefly, running turns finish first.");
   assert.equal(ACCESS_TEXT.needs_setup.title, "Access not set up");
   // wrong_user stands for two causes: herdr runs as another user, or there is no single gateway unit.
   assert.match(ACCESS_TEXT.wrong_user.body, /another user/);

@@ -122,8 +122,8 @@ export const shownMachines = (record, now) => [...new Set(Object.values(record ?
 // An unseen needs-you event on that machine: its red strip in the panel of another instance.
 export const needsYou = (unseen, machine) => unseen?.[machine]?.needs > 0;
 
-// The Dock badge: the number of unseen needs-you events, else none.
+// The Dock badge: one marker without a number while a needs-you event is unseen, else none (null clears it).
+const BADGE = "•";
 export function badgeOf(unseen) {
-  const n = Object.values(unseen ?? {}).reduce((sum, u) => sum + (u?.needs > 0 ? u.needs : 0), 0);
-  return n > 0 ? String(n) : null;
+  return Object.values(unseen ?? {}).some((u) => u?.needs > 0) ? BADGE : null;
 }
