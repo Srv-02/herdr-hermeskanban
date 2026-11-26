@@ -357,6 +357,14 @@ test("the filter bar: a wide search, the agent menu beside priority and grouping
   for (const id of ["prio", "agent", "group"]) assert.match(second, new RegExp(`"${id}"`), id);
 });
 
+// A divider line between the filter rows, over the panel's full width, as ghchecker separates its bars.
+test("the filter rows are separated by a divider line", () => {
+  const src = source("main.js"), bar = src.slice(src.indexOf("filterBar(t, agents"), src.indexOf("// ---- drawing: the list"));
+  const first = bar.slice(bar.indexOf(".child(h_flex().gap("), bar.lastIndexOf(".child(h_flex().gap("));
+  assert.match(first, /^\.child\(h_flex\(\)\.gap\(8\)\.items_center\(\)\.px\(8\)\.pt\(8\)\.pb\(6\)\.border_b\(1\)\.border_color\(t\.border\)/);
+  assert.match(bar, /return v_flex\(\)\.flex_none\(\)\.border_b\(1\)\.border_color\(t\.border\)/, "no side padding on the bar: the line spans the width");
+});
+
 // Single agent mode hides agent names for that instance: row meta, grouping by agent, the overlay's top and blocked box,
 // the toasts.
 test("single agent mode shows no agent names", () => {
