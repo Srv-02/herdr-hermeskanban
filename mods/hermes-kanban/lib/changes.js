@@ -17,19 +17,20 @@ export function parseStamp(stdout) {
 const CYCLING = "block_unblock_cycling";
 
 // What happened between two snapshots. No previous snapshot sets the baseline: nothing is reported. Tasks are matched
-// by machine and ID together, and a task missing from the previous snapshot is not reported.
+// by machine and ID together. A task missing from the previous snapshot counts as a change from nothing, so one created
+// already blocked, or created and finished within one poll, still reports. One change per task: failed (it carries the
+// reason) before needs_you before done.
 export function diffBoards(prev, next) {
   if (!prev) return [];
   const before = new Map(prev.tasks.map((t) => [taskKey(t), t]));
   const out = [];
   for (const t of next.tasks) {
-    const old = before.get(taskKey(t));
-    if (!old) continue;
+    const old = before.get(taskKey(t)) ?? { status: null, failures: 0, warnings: [] };
     const change = (kind, text) => out.push({ machine: t.machine, id: t.id, title: t.title, agent: t.assignee, kind, text, failure: t.failure });
     if (t.failures > old.failures) change("failed", "failed");
-    if (t.status !== old.status && NEEDS_YOU.includes(t.status)) change("needs_you", t.status);
+    else if (t.status !== old.status && NEEDS_YOU.includes(t.status)) change("needs_you", t.status);
+    else if (t.warnings.includes(CYCLING) && !old.warnings.includes(CYCLING)) change("needs_you", "keeps cycling between blocked and unblocked");
     else if (t.status !== old.status && t.status === "done") change("done", "done");
-    if (t.warnings.includes(CYCLING) && !old.warnings.includes(CYCLING)) change("needs_you", "keeps cycling between blocked and unblocked");
   }
   return out;
 }

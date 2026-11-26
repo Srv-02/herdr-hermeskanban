@@ -57,7 +57,6 @@ test("diffBoards keeps machines apart", () => {
   const next = { devbox: board("devbox", [t("t_a1b2", { status: "blocked" })]), labbox: board("labbox", [t("t_a1b2", { status: "todo" })]) };
   const c = diffBoards(merge(prev.devbox, prev.labbox), merge(next.devbox, next.labbox));
   assert.deepEqual(c.map((x) => [x.machine, x.id]), [["devbox", "t_a1b2"]]);
-  assert.deepEqual(diffBoards(prev.labbox, next.devbox), []);
 });
 
 test("diffBoards ignores a task that was already blocked", () => {
@@ -90,3 +89,16 @@ test("dotOf: red over green over yellow, count of blocked and review", () => {
 });
 
 test("dotOf: nothing -> no dot", () => assert.deepEqual(dotOf({}, {}), { tone: null, count: 0 }));
+
+test("diffBoards: a task new since the baseline reports its current state", () => {
+  const prev = board("devbox", [t("t_old", { status: "todo" })]);
+  const next = board("devbox", [t("t_old", { status: "todo" }), t("t_b", { status: "blocked" }), t("t_d", { status: "done" }), t("t_t", { status: "todo" })]);
+  assert.deepEqual(diffBoards(prev, next).map((x) => [x.id, x.kind]), [["t_b", "needs_you"], ["t_d", "done"]]);
+  assert.deepEqual(diffBoards(null, next), []);
+});
+
+test("diffBoards: at most one change per task, failed wins", () => {
+  const prev = board("devbox", [t("t_1", { status: "running" })]);
+  const next = board("devbox", [t("t_1", { status: "blocked", failures: 1, failure: "crashed", warnings: ["block_unblock_cycling"] })]);
+  assert.deepEqual(diffBoards(prev, next).map((x) => [x.id, x.kind, x.failure]), [["t_1", "failed", "crashed"]]);
+});
