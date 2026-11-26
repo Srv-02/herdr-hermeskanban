@@ -301,3 +301,12 @@ test("new task: without a picked agent it goes to Hermes' default agent", async 
   assert.equal(sent.length, 1);
   assert.equal(sent[0].assignee, "default");
 });
+
+// Hermes' own board (apps/desktop/src/plugins/kanban/types.ts COLUMN_META) draws triage in its tertiary text grey,
+// todo in the secondary one: here the theme's dim and muted.
+test("status colors: triage grey as in Hermes", async () => {
+  const { look } = await import("../mods/hermes-kanban/ui.js");
+  const t = { muted: "#999999", dim: "#666666" }, c = { red: "#ff0000", orange: "#ff8800", blue: "#0000ff", yellow: "#ffff00", magenta: "#ff00ff" };
+  assert.equal(look("triage", t, c, false).color, t.dim);
+  assert.equal(look("todo", t, c, false).color, t.muted);
+});
