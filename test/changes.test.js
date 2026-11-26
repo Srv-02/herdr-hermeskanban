@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { STAMP_SCRIPT, parseStamp, diffBoards, toastOf, dotOf, alertsOf, countUnseen, needsYou, badgeOf, nextUnseen, shownNext, shownMachines } from "../mods/hermes-kanban/lib/changes.js";
+import { STAMP_SCRIPT, parseStamp, diffBoards, toastOf, dotOf, alertsOf, countUnseen, needsYou, badgeOf, nextUnseen, shownNext, shownMachines, clearUnseen } from "../mods/hermes-kanban/lib/changes.js";
 
 const t = (id, o = {}) => ({
   machine: "devbox", id, title: `title ${id}`, status: "todo", assignee: "writer", failure: null, failures: 0, warnings: [], ...o,
@@ -184,4 +184,12 @@ test("shownMachines: fresh entries only", () => {
   assert.deepEqual(shownMachines(rec, 110000), ["devbox", "labbox"]);
   assert.deepEqual(shownMachines(rec, 130000), ["devbox"], "an entry older than 2 minutes is gone");
   assert.deepEqual(shownMachines(null, 0), []);
+});
+
+test("clearUnseen: zeroes one machine at once, null when nothing to clear", () => {
+  const unseen = { devbox: { needs: 2, done: 1 }, labbox: { needs: 1, done: 0 } };
+  assert.deepEqual(clearUnseen(unseen, "devbox"), { devbox: { needs: 0, done: 0 }, labbox: { needs: 1, done: 0 } });
+  assert.equal(clearUnseen({ devbox: { needs: 0, done: 0 } }, "devbox"), null);
+  assert.equal(clearUnseen(unseen, "testbox"), null);
+  assert.equal(clearUnseen(null, "devbox"), null);
 });

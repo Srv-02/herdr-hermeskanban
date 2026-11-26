@@ -1,10 +1,10 @@
-// Hermes Kanban: the Kanban board of the Hermes instance in the focused pane, as a side panel, and a button in the
+// Hermes Kanban: the Kanban board of the Hermes instance on the focused pane's machine, as a side panel, and a button in the
 // tab bar that tells when an agent finished or needs you.
 // One mod, several roles by props, as ghchecker: the panel (none), its button in the tab bar ({ button: true }), and
 // as overlays of the panel the task ({ task }), the new task ({ create }), the settings ({ settings: true }) and the
 // small menus ({ menu }). The button's block is always in the layout, so it carries the watcher (watcher.js): it polls
 // every visible instance also while the panel is hidden, and runs the daily update check. The panel only reads what
-// the watcher shares (hermes-kanban.boards) and follows the focused pane.
+// the watcher shares (hermes-kanban.boards) and follows the focused pane's machine.
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, v_virtual_list, Scrollbar } from "gpui-base";
 import { spaces, panes, focused, layout, theme, openOverlay, props, shared, setShared, run, nextCommand, checking, readTextFile, appHome, window as hostWindow } from "herdr";
@@ -14,11 +14,11 @@ import { CreateDialog } from "./create.js";
 import { SettingsDialog } from "./settings.js";
 import { Access } from "./access.js";
 import { tones, alpha, glyph, glyphOf, segmented, chip, blankslate, look, GOLD } from "./ui.js";
-import { dotOf, needsYou, shownNext } from "./lib/changes.js";
+import { dotOf, needsYou, shownNext, clearUnseen } from "./lib/changes.js";
 import { loadSettings, defaults, isSingleAgent } from "./lib/settings.js";
 import { createUpdateGate, updateCheck, fetchLatest, localVersion, gearState } from "./lib/update.js";
 import { leaseNext } from "./lib/lease.js";
-import { focusedInstance, visibleMachines, jumpTarget, rememberPane } from "./lib/instances.js";
+import { focusedInstance, visibleMachines, jumpTarget, rememberPane, buttonAction } from "./lib/instances.js";
 import { filterTasks, groupTasks, hintOf, prioLabel, agentsLabel, toggleAgent, pickedAgents } from "./lib/view.js";
 import { taskKey } from "./lib/board.js";
 import { ago } from "./lib/time.js";
@@ -59,6 +59,7 @@ export default class HermesKanban extends View {
       const panels = shared("workspace.panels") ?? ["files", "changes"];
       if (!panels.includes(MOD)) setShared("workspace.panels", [...panels, MOD]);
       this.button = true;
+      this.last = null; // the focus of the last look, as the panel's
       if (checking()) return; // herdr-app check runs init: no polling, no update check there
       this.me = (Math.random().toString(36).slice(2) + "00000000").slice(0, 8);
       this.gate = createUpdateGate(Date.now);
@@ -113,9 +114,10 @@ export default class HermesKanban extends View {
     cx.spawn(async (cx) => { this.settings = (await loadSettings(readTextFile, appHome)).values; cx.notify(); });
   }
 
-  // The focus now: the Hermes pane and its machine, or none. A click into this panel keeps the last one.
+  // The focus now: the focused pane and its machine when that machine runs Hermes, or none. A click into this panel
+  // keeps the last one.
   focusNow() {
-    return focusedInstance({ spaces: spaces(), panes: panes(), focused: focused() }, this.last);
+    return focusedInstance({ spaces: spaces(), panes: panes(), focused: focused(), boards: shared("hermes-kanban.boards") }, this.last);
   }
   tick(cx) {
     // Nothing to do while the panel is hidden or the window can't be seen (minimized, covered, another Space).
@@ -185,27 +187,57 @@ export default class HermesKanban extends View {
 
   // ---- the tab bar button ----
   // Adapted from ghchecker (MIT), mods/ghchecker/main.js toolbar(), itself from jankeesvw/herdr-issues (MIT).
+  // A click jumps to another instance that needs you, else toggles the panel on a pane of a machine that runs Hermes,
+  // else only closes a
+  // shown panel (lib/instances.js buttonAction). The focus keeps the last one while a mod block (the panel) has the
+  // keyboard, as the panel's, so the button stays on while the panel is used.
   toolbar(t) {
     const root = layout(), panel = find(root, "panel"), body = find(root, "panel-body");
     const id = body?.children?.find((c) => c.content?.mod === MOD && !c.content?.props?.button)?.id ?? MOD;
     // panel-body is a stack (one panel at a time) or a column (panels stacked, each toggled).
     const stack = body?.type === "stack", ids = stack ? [body?.active] : (body?.children ?? []).filter((c) => !c.hidden).map((c) => c.id);
     const on = Boolean(panel) && !panel.hidden && ids.includes(id);
-    const ink = on ? t.foreground : t.muted;
+    const toggle = (open) => {
+      if (stack) {
+        if (!open) run("layout.hide", { id: "panel" });
+        else { run("layout.select", { stack: "panel-body", child: id }); run("layout.show", { id: "panel" }); }
+        return;
+      }
+      const now = panel?.hidden ? [] : ids, want = open ? [...now.filter((x) => x !== id), id] : now.filter((x) => x !== id);
+      if (!want.length) { run("layout.hide", { id: "panel" }); return; }
+      for (const child of body.children) run(want.includes(child.id) ? "layout.show" : "layout.hide", { id: child.id });
+      run("layout.show", { id: "panel" });
+    };
+    // After a jump the panel opens in the target space. The tab bar restores each space's panel once it sees the new
+    // space, which can hide it again: until `opening.until` the panel is shown again whenever that space hides it.
+    const space = spaces().find((s) => s.active);
+    if (this.opening && Date.now() > this.opening.until) this.opening = null;
+    if (this.opening && !on && space?.machine === this.opening.machine) toggle(true);
+    const focus = this.last = focusedInstance({ spaces: spaces(), panes: panes(), focused: focused(), boards: shared("hermes-kanban.boards") }, this.last);
+    const act = buttonAction({ focus, machines: visibleMachines(spaces()), unseen: shared("hermes-kanban.unseen"), on });
+    const off = act.kind === "off", ink = on ? t.foreground : t.muted;
+    const tip = act.kind === "jump" ? `Go to ${act.machine}` : off ? "No Hermes on this machine" : null;
     return h_flex().size_full().pr(10).items_center().justify_end().bg(t.chrome).border_b(1).border_color(t.border)
-      .child(h_flex().id("panel-hermes-kanban").h(26).px(8).gap(5).flex_none().items_center().rounded(6).cursor_pointer()
+      .child(h_flex().id("panel-hermes-kanban").h(26).px(8).gap(5).flex_none().items_center().rounded(6)
         .text_size(12).bg(on ? t.selected : t.chrome).text_color(ink)
-        .hover((s) => s.bg(t.hover)).on_mouse_down("left", (_e, cx) => cx.stop_propagation())
-        .on_click(() => {
-          if (stack) {
-            if (on) run("layout.hide", { id: "panel" });
-            else { run("layout.select", { stack: "panel-body", child: id }); run("layout.show", { id: "panel" }); }
-            return;
-          }
-          const now = panel?.hidden ? [] : ids, want = on ? now.filter((x) => x !== id) : [...now, id];
-          if (!want.length) { run("layout.hide", { id: "panel" }); return; }
-          for (const child of body.children) run(want.includes(child.id) ? "layout.show" : "layout.hide", { id: child.id });
-          run("layout.show", { id: "panel" });
+        .when(Boolean(tip), (e) => e.tooltip(tip))
+        .when(off, (e) => e.cursor_default()).when(!off, (e) => e.cursor_pointer())
+        .hover((s) => s.bg(off ? t.chrome : t.hover))
+        .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+        .on_click((_e, cx) => {
+          if (act.kind === "jump") {
+            const target = jumpTarget(act.machine, { spaces: spaces(), panes: panes() }, shared("hermes-kanban.lastPanes"));
+            if (!target) return;
+            run("pane.focus", target);
+            // The click clears that machine's dot at once; the panel there marks it seen.
+            const cleared = clearUnseen(shared("hermes-kanban.unseen"), act.machine);
+            if (cleared) setShared("hermes-kanban.unseen", cleared);
+            this.opening = { machine: act.machine, until: Date.now() + 1500 };
+            toggle(true);
+            // The restore may come without a render of this block: look again while the window lasts.
+            for (const ms of [300, 800, 1400]) cx.timer.after(ms, (cx) => cx.notify());
+          } else if (act.kind === "toggle") toggle(!on);
+          else if (act.kind === "close") toggle(false);
         })
         .child(this.mark(t, ink)).child("Hermes"));
   }
@@ -445,6 +477,9 @@ export default class HermesKanban extends View {
       this.seenFor = { machine, k };
       const marks = shared("hermes-kanban.seen"), base = marks && typeof marks === "object" && typeof marks.machine !== "string" ? marks : {};
       setShared("hermes-kanban.seen", { ...base, [machine]: Date.now() });
+      // The dot goes at once, not at the watcher's next beat.
+      const cleared = clearUnseen(unseen, machine);
+      if (cleared) setShared("hermes-kanban.unseen", cleared);
     }
   }
   // The instance this panel copy shows now, for the watcher (it counts nothing new there); null while hidden or no
@@ -482,17 +517,18 @@ export default class HermesKanban extends View {
     const config = shared("hermes-kanban.config");
     if (config?.at && config.at !== this.configAt) { this.configAt = config.at; this.readSettings(cx); }
 
-    // Follow me: the board of the Hermes in the focused pane, and nothing else. Only a click into this panel (a mod
-    // block has the keyboard) keeps the last one (lib/instances.js).
+    // Follow me: the board of the Hermes on the focused pane's machine, and nothing else. Any pane there counts, a
+    // shell as well. Only a click into this panel (a mod block has the keyboard) keeps the last one (lib/instances.js).
     const view = { spaces: spaces(), panes: panes() };
-    const focus = this.last = focusedInstance({ ...view, focused: focused() }, this.last);
+    const boards = shared("hermes-kanban.boards") ?? {};
+    const focus = this.last = focusedInstance({ ...view, focused: focused(), boards }, this.last);
     this.focusKey = JSON.stringify(focus);
     if (!focus.hermes) {
       this.setShown(null);
       this.entries = [];
       return this.shell(t).child(this.header(t, c, null, null)).children(this.strips(t, c, null))
-        .child(blankslate(t, { icon: "kanban", title: "No Hermes in this pane", tone: t.muted,
-          body: ["The panel follows the focused pane. Focus a pane that runs Hermes to see its board.", "Hermes on machines with an open space is still watched."] }));
+        .child(blankslate(t, { icon: "kanban", title: "No Hermes on this machine", tone: t.muted,
+          body: ["The panel shows the Hermes of the focused pane's machine. Focus a pane on a machine that runs Hermes to see its board.", "Hermes on machines with an open space is still watched."] }));
     }
     const before = shared("hermes-kanban.lastPanes") ?? {}, lastPanes = rememberPane(before, focus, view.panes);
     if (lastPanes !== before) setShared("hermes-kanban.lastPanes", lastPanes);
@@ -500,7 +536,6 @@ export default class HermesKanban extends View {
     this.setShown(visible ? focus.machine : null);
     if (visible) this.markSeen(focus.machine);
 
-    const boards = shared("hermes-kanban.boards") ?? {};
     const snap = boards?.[focus.machine];
     const shell = this.shell(t).child(this.header(t, c, focus.machine, snap)).children(this.strips(t, c, focus.machine));
     this.entries = [];

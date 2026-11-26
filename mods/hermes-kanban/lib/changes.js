@@ -120,6 +120,14 @@ export function shownNext(record, copy, machine, now) {
 // The machines a panel copy shows now: those of the fresh entries.
 export const shownMachines = (record, now) => [...new Set(Object.values(record ?? {}).filter((e) => fresh(e, now)).map((e) => e.machine))];
 
+// The record with that machine's counts zeroed, for the panel and the button to clear its dot at once (the watcher
+// zeroes it again at its next pass from the seen mark); null when nothing is there to clear.
+export function clearUnseen(unseen, machine) {
+  const u = unseen?.[machine];
+  if (!u || ((u.needs ?? 0) === 0 && (u.done ?? 0) === 0)) return null;
+  return { ...unseen, [machine]: { needs: 0, done: 0 } };
+}
+
 // An unseen needs-you event on that machine: its red strip in the panel of another instance.
 export const needsYou = (unseen, machine) => unseen?.[machine]?.needs > 0;
 

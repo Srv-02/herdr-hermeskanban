@@ -70,7 +70,7 @@ const patches = [
   ["create.js", swapExec],
   ["access.js", swapExec],
   ["lib/instances.js", "export const visibleMachines = (spaces) =>", "const realVisibleMachines = (spaces) =>"],
-  ["lib/instances.js", "export function focusedInstance({ spaces, panes, focused }, last = null) {", "function realFocusedInstance({ spaces, panes, focused }, last = null) {"],
+  ["lib/instances.js", "export function focusedInstance({ spaces, panes, focused, boards }, last = null) {", "function realFocusedInstance({ spaces, panes, focused, boards }, last = null) {"],
   ["lib/instances.js", "export function jumpTarget(machine, { spaces, panes }, lastPanes) {", "function realJumpTarget(machine, { spaces, panes }, lastPanes) {"],
   ["lib/update.js", "export async function fetchRelease(fetchFn, sleep) {",
     `export async function fetchRelease(fetchFn, sleep) {\n  return { tag: ${JSON.stringify(tag)} }; ${MARK}: no request to GitHub`],
