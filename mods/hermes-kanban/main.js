@@ -279,34 +279,34 @@ export default class HermesKanban extends View {
         .child(div().flex_none().text_color(t.muted).child("Go to pane →")));
   }
 
-  // A menu button as ghchecker's: 24 px, muted, the foreground on hover.
   dropButton(id, label, t, onClick) {
-    return h_flex().id(id).h(24).px(8).gap(4).flex_none().items_center().rounded(6).text_size(12).text_color(t.muted)
-      .cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground))
+    return h_flex().id(id).h(22).px(8).gap(4).flex_none().items_center().rounded(6).text_size(12).text_color(t.foreground)
+      .cursor_pointer().hover((s) => s.bg(t.hover))
       .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
       .on_click(onClick)
       .child(div().truncate().child(label)).child(glyph("chevron-down", 12, t.muted));
   }
 
-  // The filter bar, shown with the filter button, as ghchecker's: the search field (with the agent menu beside it as
-  // ghchecker's sort menu; an instance can have any number of profiles; not in single agent mode), then state and
-  // priority, then grouping (by agent not in single agent mode).
+  // The filter bar, shown with the filter button, in two rows: state and the search over the rest of the width (as
+  // ghchecker's field), then priority, agent (a menu: an instance can have any number of profiles; not in single agent
+  // mode) and grouping (by agent not in single agent mode).
   filterBar(t, agents, agent, single) {
-    const label = (text) => div().flex_none().text_size(11).text_color(t.muted).child(text);
+    const label = (text) => div().flex_none().mr(6).text_size(11).text_color(t.muted).child(text);
     const pick = (patch) => (_k, cx) => { this.setFilter(patch(_k)); cx.notify(); };
-    return v_flex().flex_none().px(8).py(6).gap(6).border_b(1).border_color(t.border)
-      .child(h_flex().gap(6)
-        .child(div().id("search").flex_1().min_w(0).h(24).px(8).flex().items_center().rounded(6).border_1().border_color(t.border).cursor_text()
-          .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
-          .child(Input.new(this.input).w_full().h_full().text_size(12).text_color(t.foreground)))
-        .when(!single, (e) => e.child(this.dropButton("agent", agent === "all" ? "All agents" : agent, t,
-          () => this.openMenu("agent", [["all", "All agents"], ...agents.map((a) => [a, a]), ["none", "none"]], agent)))))
-      .child(h_flex().gap(6).items_center()
+    return v_flex().flex_none().px(8).pt(8).pb(6).gap(6).border_b(1).border_color(t.border)
+      .child(h_flex().gap(8).items_center()
         .child(segmented("state", [["open", "Open"], ["done", "Done"], ["all", "All"]], this.f.state, t, pick((k) => ({ state: k }))))
-        .child(div().flex_1())
+        .child(h_flex().id("search").flex_1().min_w(0).h(24).px(8).gap(6).items_center().rounded(6).border_1().border_color(t.border).cursor_text()
+          .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+          .child(glyph("search", 12, t.muted))
+          .child(Input.new(this.input).flex_1().min_w(0).h_full().text_size(12).text_color(t.foreground))))
+      .child(h_flex().gap(2).items_center()
         .child(label("Prio"))
-        .child(segmented("prio", [["all", "All"], ["p1", "P1"], ["p2", "P2"], ["p3+", "P3+"]], this.f.prio, t, pick((k) => ({ prio: k })))))
-      .child(h_flex().gap(6).items_center()
+        .child(segmented("prio", [["all", "All"], ["p1", "P1"], ["p2", "P2"], ["p3+", "P3+"]], this.f.prio, t, pick((k) => ({ prio: k }))))
+        .when(!single, (e) => e.child(div().w(10)).child(label("Agent"))
+          .child(this.dropButton("agent", agent === "all" ? "All" : agent, t,
+            () => this.openMenu("agent", [["all", "All"], ...agents.map((a) => [a, a]), ["none", "none"]], agent))))
+        .child(div().flex_1())
         .child(label("Group"))
         .child(segmented("group", [["status", "Status"], ...(single ? [] : [["agent", "Agent"]]), ["none", "None"]], single && this.f.group === "agent" ? "status" : this.f.group, t, pick((k) => ({ group: k })))));
   }
@@ -381,7 +381,7 @@ export default class HermesKanban extends View {
   statusBar(t, c, snap) {
     const running = (snap.board?.tasks ?? []).filter((x) => x.status === "running").length, n = snap.problems;
     const gw = snap.status, up = gw?.running === true, version = gw?.version ? String(gw.version).replace(/^v/i, "") : null;
-    return h_flex().id("status-bar").h(30).flex_none().px(14).gap(12).items_center().border_t(1).border_color(t.border).bg(t.chrome ?? t.background)
+    return h_flex().id("status-bar").h(30).flex_none().px(12).gap(12).items_center().border_t(1).border_color(t.border).bg(t.chrome ?? t.background)
       .text_size(11.5).text_color(t.muted)
       .child(snap.error
         ? h_flex().id("sync-warning").min_w(0).gap(5).items_center().text_color(c.red).tooltip(snap.error)
