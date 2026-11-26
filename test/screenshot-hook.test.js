@@ -188,8 +188,29 @@ test("the notifications scene: after the turn a labbox task needs input, and the
 test("the fake runs as a command, the way the hooked exec calls it", () => {
   const fake = path.join(root, "scripts/screenshots/demo/hermes.mjs");
   const call = { cmd: "sh", args: ["-c", "x", "sh"], on: "devbox" };
-  const ok = spawnSync("node", [fake, JSON.stringify(call), JSON.stringify({ scene: "board" })], { encoding: "utf8" });
-  assert.notEqual(ok.status, 0, "an unknown script fails");
+  const unknown = spawnSync("node", [fake, JSON.stringify(call), JSON.stringify({ scene: "board" })], { encoding: "utf8" });
+  assert.notEqual(unknown.status, 0, "an unknown script fails");
   const status = spawnSync("node", [fake, JSON.stringify({ cmd: "hermes", args: ["gateway", "restart"], on: "devbox" }), "{}"], { encoding: "utf8" });
   assert.equal(status.status, 0, status.stderr);
+});
+
+test("demo-instance.sh deletes only its own paths below tmp/ and the core state of hkshots", () => {
+  const script = path.join(root, "scripts/screenshots/demo-instance.sh");
+  const guard = (p) => spawnSync("sh", [script, "guard", p], { encoding: "utf8" }).status;
+  const home = process.env.HOME;
+  for (const p of [path.join(root, "tmp/shots-home"), path.join(root, "tmp/shots-spaces"), `${home}/.local/state/herdr-core/hkshots`]) assert.equal(guard(p), 0, p);
+  for (const p of [root, path.join(root, "tmp"), `${root}/tmp/`, path.join(root, "tmp/../mods"), `${root}/tmp/shots-home/../../mods`, home, "/",
+    `${home}/.local/state/herdr-core/hktest`, `${home}/.local/state/herdr-core/default`, path.join(root, "tmp-other")]) assert.equal(guard(p), 1, p);
+  // No deleted path comes from the environment, and every deletion goes through the guard; shoot.sh deletes only files.
+  const text = fs.readFileSync(script, "utf8");
+  for (const v of ["DEMO_DIR", "XDG_STATE_HOME"]) assert.ok(!text.includes(v), v);
+  assert.deepEqual(text.split("\n").filter((l) => /\brm\s/.test(l) && !/^\s*#/.test(l)).map((l) => l.trim()), ['rm -rf -- "$@"']);
+  const shoot = fs.readFileSync(path.join(root, "scripts/screenshots/shoot.sh"), "utf8");
+  assert.ok(!/\brm\s+-[a-z]*r/.test(shoot), "shoot.sh removes no folder");
+});
+
+test("shoot.sh rejects an unknown card before it starts anything", () => {
+  const r = spawnSync("bash", [path.join(root, "scripts/screenshots/shoot.sh"), "board", "boards"], { encoding: "utf8", env: { ...process.env, CROP_ONLY: "1" } });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /unknown card: boards/);
 });

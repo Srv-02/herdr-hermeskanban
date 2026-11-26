@@ -10,7 +10,8 @@
 #
 # Sizes: every window is W = 860 points wide (1720 pixels at 2x, panel 446 points, app zoom 1). Its height H sets the panel
 # height (2H - 176 pixels): H is chosen per card so the panel shows its rows down to the status bar (one row is 46 points, a
-# group heading 32). The hero is 2044 x 1144, the feature cards 1760 wide (880 CSS pixels at 2x). Change the fixtures in
+# group heading 32). Every card is 2044 px wide (1022 CSS pixels at 2x) like the hero (2044 x 1144), its panel, overlay or
+# dialog centered at its own size. Change the fixtures in
 # demo/hermes.mjs and the rows move: adjust H_* and look at every card again.
 set -eu
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -27,7 +28,11 @@ H_OVERLAY=896 H_DIALOG=940
 # Hermes button at the right end of the tab bar. Check both on tmp/shots-raw/notifications.png after a new layout.
 TOAST_BOX="$((2 * H_NOTIFY - 300)) 968 720 160"
 BUTTON_BOX="0 $((2 * W - 184)) 184 84"
+CARDS="hero board overlay notifications settings"
 ONLY="$*"
+for w in $ONLY; do
+  case " $CARDS " in *" $w "*) ;; *) echo "unknown card: $w (one of: $CARDS)" >&2; exit 2 ;; esac
+done
 want() { [ -z "$ONLY" ] && return 0; for w in $ONLY; do [ "$w" = "$1" ] && return 0; done; return 1; }
 inst() { "$S/demo-instance.sh" "$@"; }
 cleanup() { inst quit >/dev/null 2>&1 || true; inst clean >/dev/null 2>&1 || true; }
@@ -94,11 +99,11 @@ render() { "$S/render.sh" "$C/$1.html" "$2" "$3" "$4" > /dev/null; }
 mkdir -p "$ROOT/screenshots"
 # The hero: 1022 x 572, as Filer Pro's and GitHub Checker's.
 if want hero && [ -f "$RAW/hero.png" ]; then panel hero $H_HERO hero-panel; render hero "$ROOT/preview.png" 1022 572; fi
-# The feature cards: 880 wide, each shot at its own size (2x) with 60 above and below; a panel card is H + 32 tall.
-if want board && [ -f "$RAW/board.png" ]; then panel board $H_BOARD board-panel; render board "$ROOT/screenshots/board.png" 880 $((H_BOARD + 32)); fi
+# The feature cards: as wide as the hero, each shot at its own size (2x) with 60 above and below; a panel card is H + 32 tall.
+if want board && [ -f "$RAW/board.png" ]; then panel board $H_BOARD board-panel; render board "$ROOT/screenshots/board.png" 1022 $((H_BOARD + 32)); fi
 if want overlay && [ -f "$RAW/overlay.png" ]; then
   # The whole task overlay, down to its comment box.
-  box overlay 91 105 1510 1444 overlay; render overlay "$ROOT/screenshots/overlay.png" 880 842
+  box overlay 91 105 1510 1444 overlay; render overlay "$ROOT/screenshots/overlay.png" 1022 842
 fi
 if want notifications && [ -f "$RAW/notifications.png" ]; then
   panel notifications $H_NOTIFY notifications-panel
@@ -106,9 +111,9 @@ if want notifications && [ -f "$RAW/notifications.png" ]; then
   box notifications $TOAST_BOX notifications-toast
   # shellcheck disable=SC2086
   box notifications $BUTTON_BOX notifications-button
-  render notifications "$ROOT/screenshots/notifications.png" 880 $((H_NOTIFY + 32))
+  render notifications "$ROOT/screenshots/notifications.png" 1022 $((H_NOTIFY + 32))
 fi
 if want settings && [ -f "$RAW/settings-dialog.png" ]; then
-  box settings-dialog 96 242 1236 1688 settings-dialog; render settings "$ROOT/screenshots/settings.png" 880 964
+  box settings-dialog 96 242 1236 1688 settings-dialog; render settings "$ROOT/screenshots/settings.png" 1022 964
 fi
 echo "rendered into screenshots/ and preview.png. Look at every image before you commit it: no user name, no real path, no real host."

@@ -10,9 +10,10 @@ if [ "$#" -ne 4 ]; then
 fi
 
 EDGE="${EDGE:-/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge}"
-HERE="$(cd "$(dirname "$0")" && pwd)"
-# A throwaway profile next to this script, so the run never touches your browser profile.
-PROFILE="$HERE/.edge-profile"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# A throwaway profile below tmp/ of this checkout, so the run never touches your browser profile.
+PROFILE="$ROOT/tmp/edge-profile"
+mkdir -p "$PROFILE"
 IN="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 OUT_DIR="$(cd "$(dirname "$2")" && pwd)"
 OUT="$OUT_DIR/$(basename "$2")"
