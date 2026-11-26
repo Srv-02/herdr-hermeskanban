@@ -1,0 +1,58 @@
+// Change detection: the stamp that tells when a board may have changed, the diff of two boards, the title bar dot and
+// the toast texts. Pure functions.
+import { taskKey } from "./board.js";
+import { NEEDS_YOU } from "./view.js";
+
+// Modification time (nanoseconds) and size of the Hermes database and its WAL. Cheap to read, and the content is never
+// opened. Needs GNU find (-printf); a missing WAL is normal.
+export const STAMP_SCRIPT = `find "$HOME/.hermes" -maxdepth 1 \\( -name kanban.db -o -name kanban.db-wal \\) -printf '%f %T@ %s\\n'`;
+
+// Sorted, normalized lines as one string, so two stamps compare with ===. Null when kanban.db is missing: no Hermes here.
+export function parseStamp(stdout) {
+  const lines = String(stdout).split("\n").map((l) => l.trim().split(/\s+/)).filter((p) => p.length === 3 && ["kanban.db", "kanban.db-wal"].includes(p[0]));
+  if (!lines.some((p) => p[0] === "kanban.db")) return null;
+  return lines.map((p) => p.join(" ")).sort().join("\n");
+}
+
+const CYCLING = "block_unblock_cycling";
+
+// What happened between two snapshots. No previous snapshot sets the baseline: nothing is reported. Tasks are matched
+// by machine and ID together, and a task missing from the previous snapshot is not reported.
+export function diffBoards(prev, next) {
+  if (!prev) return [];
+  const before = new Map(prev.tasks.map((t) => [taskKey(t), t]));
+  const out = [];
+  for (const t of next.tasks) {
+    const old = before.get(taskKey(t));
+    if (!old) continue;
+    const change = (kind, text) => out.push({ machine: t.machine, id: t.id, title: t.title, agent: t.assignee, kind, text, failure: t.failure });
+    if (t.failures > old.failures) change("failed", "failed");
+    if (t.status !== old.status && NEEDS_YOU.includes(t.status)) change("needs_you", t.status);
+    else if (t.status !== old.status && t.status === "done") change("done", "done");
+    if (t.warnings.includes(CYCLING) && !old.warnings.includes(CYCLING)) change("needs_you", "keeps cycling between blocked and unblocked");
+  }
+  return out;
+}
+
+const TOAST = {
+  needs_you: { verb: "needs input", level: "warning" },
+  done: { verb: "finished", level: "success" },
+  failed: { verb: "failed", level: "error" },
+};
+
+export function toastOf(change) {
+  const { verb, level } = TOAST[change.kind];
+  const body = change.kind === "failed" && change.failure ? `${change.title}: ${change.failure}` : change.title;
+  return { title: `${change.machine}: ${change.agent || "a task"} ${verb}`, body, level };
+}
+
+// Red (count of blocked and review tasks over all instances) before green (something unseen finished) before yellow
+// (something runs).
+export function dotOf(boards, unseen) {
+  const tasks = Object.values(boards).flatMap((b) => b.tasks);
+  const count = tasks.filter((t) => NEEDS_YOU.includes(t.status)).length;
+  if (count > 0) return { tone: "red", count };
+  if (Object.values(unseen).some((n) => n > 0)) return { tone: "green", count: 0 };
+  if (tasks.some((t) => t.status === "running")) return { tone: "yellow", count: 0 };
+  return { tone: null, count: 0 };
+}
