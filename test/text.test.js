@@ -34,6 +34,7 @@ test("plainHtml: the text reads as written", () => {
   assert.equal(plainHtml("<img src=x> & \"q\" 'a'"), "&lt;img src=x&gt; &amp; &quot;q&quot; &#39;a&#39;");
   assert.equal(plainHtml("[a](javascript:alert(1))"), "[a](javascript:alert(1))");
   assert.equal(plainHtml("one\ntwo\r\n\nthree"), "one<br>two<br><br>three");
+  assert.equal(plainHtml("a\rb\r\rc"), "a<br>b<br><br>c", "a lone CR breaks the line too");
   assert.equal(plainHtml("a  b\tc"), "a &nbsp;b &nbsp;c");
   assert.equal(plainHtml(null), "");
 });
@@ -54,4 +55,27 @@ test("linkify: text and https URLs in order", () => {
 test("safeLink: https only", () => {
   assert.equal(safeLink("https://example.com/a"), "https://example.com/a");
   for (const u of ["http://example.com", "javascript:alert(1)", "file:///etc/passwd", "data:text/html,x", " https://x", "", null]) assert.equal(safeLink(u), null, String(u));
+});
+
+// A hostile body must not freeze the overlay: linear time on long punctuation runs and long URLs.
+test("plainHtml: 200k-char hostile inputs finish in under 200 ms each", () => {
+  const n = 200000;
+  for (const input of [
+    `https://a${".".repeat(n)}b`,
+    `https://a${".".repeat(n)}`,
+    `https://${"a".repeat(n)}`,
+    "https://".repeat(n / 8),
+    `${"(".repeat(n / 2)}https://a${")".repeat(n / 2)}`,
+    " ".repeat(n),
+    "\r\n".repeat(n / 2),
+  ]) {
+    const t0 = performance.now();
+    plainHtml(input);
+    const ms = performance.now() - t0;
+    assert.ok(ms < 200, `${input.slice(0, 20)}… took ${ms.toFixed(1)} ms`);
+  }
+});
+
+test("linkify: a bare https:// is text, not a link", () => {
+  assert.deepEqual(linkify("https://."), [{ text: "https://" }, { text: "." }]);
 });

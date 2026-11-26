@@ -218,7 +218,10 @@ test("the overlay draws the description as plain text", () => {
   const all = fs.readdirSync(dir, { recursive: true }).filter((f) => f.endsWith(".js")).map((f) => source(f)).join("\n");
   assert.doesNotMatch(all, /TextView\.markdown\(/, "no Markdown view of Hermes content");
   const src = source("viewer.js");
-  assert.match(src, /TextView\.html\(`body-\$\{this\.id\}`, plainHtml\(body\)\)\.selectable\(true\)\.on_link_click\(\(url\) => openUrl\(safeLink\(url\)\)\)/);
+  assert.match(src, /TextView\.html\(`body-\$\{this\.id\}`, this\.bodyHtml\(body\)\)\.selectable\(true\)\.on_link_click\(\(url\) => openUrl\(safeLink\(url\)\)\)/);
+  // Memoized: plainHtml runs once per body, not on every render.
+  assert.match(src, /if \(this\.html\?\.body !== body\) this\.html = \{ body, html: plainHtml\(body\) \};/);
+  assert.equal([...code("viewer.js").matchAll(/plainHtml\(/g)].length, 1, "plainHtml is called in one place");
   assert.equal([...all.matchAll(/TextView\.html\(/g)].length, 1, "one text view, fed by plainHtml");
   assert.match(source("ui.js"), /export function openUrl\(url\) \{\s*if \(!safeLink\(url\)\) return;/);
 });

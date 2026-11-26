@@ -203,12 +203,17 @@ export class TaskViewer {
 
   // The body is untrusted (anyone who reaches the instance can write a task): drawn as plain text, never as Markdown.
   // plainHtml escapes every character and links only bare https URLs; a click opens only an https link.
+  // plainHtml once per body, not on every render.
+  bodyHtml(body) {
+    if (this.html?.body !== body) this.html = { body, html: plainHtml(body) };
+    return this.html.html;
+  }
   description(task, t) {
     const body = task?.body?.trim();
     return v_flex().flex_none().rounded(9).border_1().border_color(t.border).overflow_hidden()
       .child(h_flex().h(36).px(12).items_center().bg(t.raised).text_size(12).text_color(t.muted).child("Description"))
       .child(div().px(14).py(12).child(!this.detail ? div().text_color(t.muted).child("Loading…")
-        : body ? TextView.html(`body-${this.id}`, plainHtml(body)).selectable(true).on_link_click((url) => openUrl(safeLink(url))) : div().italic().text_color(t.muted).child("No description.")));
+        : body ? TextView.html(`body-${this.id}`, this.bodyHtml(body)).selectable(true).on_link_click((url) => openUrl(safeLink(url))) : div().italic().text_color(t.muted).child("No description.")));
   }
 
   activity(t, c) {
