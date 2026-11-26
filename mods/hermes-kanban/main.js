@@ -7,7 +7,7 @@
 // the watcher shares (hermes-kanban.boards) and follows the focused pane.
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, v_virtual_list, Scrollbar } from "gpui-base";
-import { spaces, panes, focused, layout, theme, openOverlay, closeOverlay, props, shared, setShared, run, nextCommand, checking, readTextFile, appHome, window as hostWindow } from "herdr";
+import { spaces, panes, focused, layout, theme, openOverlay, props, shared, setShared, run, nextCommand, checking, readTextFile, appHome, window as hostWindow } from "herdr";
 import { watchPass } from "./watcher.js";
 import { TaskViewer } from "./viewer.js";
 import { CreateDialog } from "./create.js";
@@ -19,7 +19,7 @@ import { loadSettings, defaults, isSingleAgent } from "./lib/settings.js";
 import { createUpdateGate, updateCheck, fetchLatest, localVersion, gearState } from "./lib/update.js";
 import { leaseNext } from "./lib/lease.js";
 import { focusedInstance, visibleMachines, jumpTarget, rememberPane } from "./lib/instances.js";
-import { filterTasks, groupTasks, hintOf, prioLabel } from "./lib/view.js";
+import { filterTasks, groupTasks, hintOf, prioLabel, agentsLabel, toggleAgent, pickedAgents } from "./lib/view.js";
 import { taskKey } from "./lib/board.js";
 import { ago } from "./lib/time.js";
 
@@ -27,9 +27,10 @@ const MOD = "hermes-kanban";
 const WATCH = 5000; // the watcher's beat; each instance is polled on its own pace (poll_seconds) within it
 const TICK = 3000;  // how often the panel looks at the focused pane (follow me, as ghchecker)
 const ROW = 46, HEADING = 32;
+const CLEAR = "#00000000";
 // Hermes' column order (hermes_cli/kanban_workflow.py), for a board whose /workflow has not come yet.
 const ORDER = ["triage", "todo", "scheduled", "ready", "running", "blocked", "review", "done"];
-const FILTERS = { state: "open", agent: "all", prio: "all", group: "status" };
+const FILTERS = { state: "open", agents: [], prio: "all", group: "status" };
 
 const remembered = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key) ?? "null") ?? fallback; } catch { return fallback; } };
 const keep = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage full: memory only */ } };
@@ -241,7 +242,7 @@ export default class HermesKanban extends View {
         .child(this.headButton("new", "plus", false, "New task", () => this.openCreate(machine), t, c))
         .child(this.headButton("refresh", "refresh", false, busy ? "Refreshing…" : failed ? `Sync failed: ${snap.error}. Click to try again.` : "Refresh",
           (cx) => { this.refresh(machine); cx.notify(); }, t, c, { spin: busy, alarm: failed }))
-        .child(this.headButton("filter", "filter", this.filtering, this.filtering ? "Hide filters" : "Filters",
+        .child(this.headButton("filter", "filter", this.filtering, this.filtering ? "Hide priority and grouping" : "Priority and grouping",
           (cx) => { this.setFiltering(!this.filtering); cx.notify(); }, t, c)))
       // Settings, also without a Hermes; gold with a slow shine while a newer release is out.
       .child(this.headButton("settings", "settings", false, gear.tip, () => this.openSettings(machine), t, c, { gold: gear.update }));
@@ -279,36 +280,44 @@ export default class HermesKanban extends View {
         .child(div().flex_none().text_color(t.muted).child("Go to pane →")));
   }
 
-  dropButton(id, label, t, onClick) {
-    return h_flex().id(id).h(22).px(8).gap(4).flex_none().items_center().rounded(6).text_size(12).text_color(t.foreground)
-      .cursor_pointer().hover((s) => s.bg(t.hover))
+  // The agent button: 24 px, the selected background while agents are picked.
+  dropButton(id, label, on, t, onClick) {
+    return h_flex().id(id).h(24).px(8).gap(4).flex_none().items_center().rounded(6).text_size(12)
+      .bg(on ? t.selected : CLEAR).text_color(on ? t.foreground : t.muted)
+      .cursor_pointer().hover((s) => s.bg(on ? t.selected : t.hover))
       .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
       .on_click(onClick)
       .child(div().truncate().child(label)).child(glyph("chevron-down", 12, t.muted));
   }
 
-  // The filter bar, shown with the filter button, in two rows: state and the search over the rest of the width (as
-  // ghchecker's field), then priority, agent (a menu: an instance can have any number of profiles; not in single agent
-  // mode) and grouping (by agent not in single agent mode). A divider line between the rows, as ghchecker's bars.
-  filterBar(t, agents, agent, single) {
+  // The filter bar, always shown, one row: state, the agents (a menu that picks several: an instance can have any
+  // number of profiles; not in single agent mode) and the search over the rest of the width, with a clear button
+  // while it has text. The filter button adds a second row below a divider line: priority and grouping (by agent not
+  // in single agent mode).
+  filterBar(t, agents, picked, single) {
     const label = (text) => div().flex_none().mr(6).text_size(11).text_color(t.muted).child(text);
     const pick = (patch) => (_k, cx) => { this.setFilter(patch(_k)); cx.notify(); };
+    const typed = this.query !== "";
     return v_flex().flex_none().border_b(1).border_color(t.border)
-      .child(h_flex().gap(8).items_center().px(8).pt(8).pb(6).border_b(1).border_color(t.border)
+      .child(h_flex().gap(8).items_center().px(8).pt(8).pb(6).when(this.filtering, (e) => e.border_b(1).border_color(t.border))
         .child(segmented("state", [["open", "Open"], ["done", "Done"], ["all", "All"]], this.f.state, t, pick((k) => ({ state: k }))))
+        .when(!single, (e) => e.child(this.dropButton("agent", agentsLabel(picked), picked.length > 0, t,
+          () => this.openMenu("agents", [["all", "All agents"], ...agents.map((a) => [a, a]), ["none", "no agent"]], picked))))
         .child(h_flex().id("search").flex_1().min_w(0).h(24).px(8).gap(6).items_center().rounded(6).border_1().border_color(t.border).cursor_text()
           .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
           .child(glyph("search", 12, t.muted))
-          .child(Input.new(this.input).flex_1().min_w(0).h_full().text_size(12).text_color(t.foreground))))
-      .child(h_flex().gap(2).items_center().px(8).pt(6).pb(6)
+          .child(Input.new(this.input).flex_1().min_w(0).h_full().text_size(12).text_color(t.foreground))
+          .when(typed, (e) => e.child(div().id("search-clear").size(16).flex_none().flex().items_center().justify_center().rounded(4).cursor_pointer()
+            .tooltip("Clear search").hover((s) => s.bg(t.hover))
+            .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+            .on_click((_e, cx) => { this.input.set_value(""); this.query = ""; cx.notify(); })
+            .child(glyph("close", 12, t.muted))))))
+      .when(this.filtering, (e) => e.child(h_flex().gap(2).items_center().px(8).pt(6).pb(6)
         .child(label("Prio"))
         .child(segmented("prio", [["all", "All"], ["p1", "P1"], ["p2", "P2"], ["p3+", "P3+"]], this.f.prio, t, pick((k) => ({ prio: k }))))
-        .when(!single, (e) => e.child(div().w(10)).child(label("Agent"))
-          .child(this.dropButton("agent", agent === "all" ? "All" : agent, t,
-            () => this.openMenu("agent", [["all", "All"], ...agents.map((a) => [a, a]), ["none", "none"]], agent))))
         .child(div().flex_1())
         .child(label("Group"))
-        .child(segmented("group", [["status", "Status"], ...(single ? [] : [["agent", "Agent"]]), ["none", "None"]], single && this.f.group === "agent" ? "status" : this.f.group, t, pick((k) => ({ group: k })))));
+        .child(segmented("group", [["status", "Status"], ...(single ? [] : [["agent", "Agent"]]), ["none", "None"]], single && this.f.group === "agent" ? "status" : this.f.group, t, pick((k) => ({ group: k }))))));
   }
 
   // ---- drawing: the list ----
@@ -353,14 +362,14 @@ export default class HermesKanban extends View {
     ]);
   }
 
-  list(t, c, snap, agent, machine, single) {
+  list(t, c, snap, agents, machine, single) {
     // Single agent mode never groups by agent: the names stay hidden.
     const group = single && this.f.group === "agent" ? "status" : this.f.group;
-    const tasks = filterTasks(snap.board.tasks, { state: this.f.state, query: this.query, agent, prio: this.f.prio });
+    const tasks = filterTasks(snap.board.tasks, { state: this.f.state, query: this.query, agents, prio: this.f.prio });
     const box = v_flex().flex_1().min_h(0).relative().px(6).py(4);
     if (!tasks.length) {
       this.entries = [];
-      const narrowed = this.query.trim() !== "" || agent !== "all" || this.f.prio !== "all";
+      const narrowed = this.query.trim() !== "" || agents.length > 0 || this.f.prio !== "all";
       const text = narrowed ? "No tasks match" : { open: "No open tasks", done: "No done tasks" }[this.f.state] ?? "No tasks";
       return box.child(div().px(16).py(28).text_size(12).text_center().text_color(t.dim).child(text));
     }
@@ -395,13 +404,23 @@ export default class HermesKanban extends View {
   }
 
   // ---- the agent menu (a popup of this mod) ----
+  // Picks several: each row toggles its agent with a checkbox and the menu stays open; "All agents" clears the picks.
+  // Every change goes to the panel through shared "hermes-kanban.pick".
   renderMenu(t) {
-    const m = this.menu;
+    const m = this.menu, picked = m.value ?? [];
+    const box = (on) => div().size(14).flex_none().flex().items_center().justify_center().rounded(4)
+      .when(on, (e) => e.bg(t.accent).child(glyph("check", 11, t.background)))
+      .when(!on, (e) => e.border_1().border_color(t.border));
     return v_flex().id("menu").size_full().p(6).gap(1).overflow_y_scroll().bg(t.popover).text_color(t.foreground).text_size(12)
       .children(m.items.map(([value, label], i) => h_flex().id(`menu-${i}`).h(28).flex_none().px(8).gap(8).items_center().rounded(6).cursor_pointer()
         .hover((s) => s.bg(t.hover))
-        .on_click(() => { setShared("hermes-kanban.pick", { kind: m.kind, value, at: Date.now() }); closeOverlay(m.overlay); })
-        .child(div().w(14).flex_none().child(value === m.value ? glyph("check", 13, t.foreground) : div()))
+        .on_click((_e, cx) => {
+          m.value = toggleAgent(picked, value);
+          setShared("hermes-kanban.pick", { kind: m.kind, value: m.value, at: Date.now() });
+          cx.notify();
+        })
+        .when(value === "all", (e) => e.text_color(t.muted).child(div().w(14).flex_none()))
+        .when(value !== "all", (e) => e.child(box(picked.includes(value))))
         .child(div().flex_1().truncate().child(label))));
   }
 
@@ -439,7 +458,7 @@ export default class HermesKanban extends View {
     const pick = shared("hermes-kanban.pick");
     if (pick?.at && pick.at !== this.pickedAt) {
       this.pickedAt = pick.at;
-      if (pick.kind === "agent" && typeof pick.value === "string") this.setFilter({ agent: pick.value });
+      if (pick.kind === "agents" && Array.isArray(pick.value)) this.setFilter({ agents: pick.value.filter((x) => typeof x === "string") });
     }
     const config = shared("hermes-kanban.config");
     if (config?.at && config.at !== this.configAt) { this.configAt = config.at; this.readSettings(cx); }
@@ -481,10 +500,10 @@ export default class HermesKanban extends View {
     }
     // Single agent mode hides the agent filter and lifts it; an agent this board does not have filters nothing.
     const single = isSingleAgent(this.settings, focus.machine), agents = snap.board.assignees;
-    const agent = single || !(this.f.agent === "none" || agents.includes(this.f.agent)) ? "all" : this.f.agent;
+    const picked = pickedAgents(this.f.agents, agents, single);
     return shell
-      .when(this.filtering, (e) => e.child(this.filterBar(t, agents, agent, single)))
-      .child(this.list(t, c, snap, agent, focus.machine, single))
+      .child(this.filterBar(t, agents, picked, single))
+      .child(this.list(t, c, snap, picked, focus.machine, single))
       .child(this.statusBar(t, c, snap));
   }
 }

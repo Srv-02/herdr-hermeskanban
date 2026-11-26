@@ -9,12 +9,25 @@ export const OPEN_DONE = { open: (t) => t.status !== "done", done: (t) => t.stat
 
 const PRIO = { all: () => true, p1: (p) => p === 1, p2: (p) => p === 2, "p3+": (p) => p >= 3 };
 
-export function filterTasks(tasks, { state, query, agent, prio }) {
+// `agents`: the picked agents, "none" for tasks without one; none picked means all.
+export function filterTasks(tasks, { state, query, agents, prio }) {
   const q = query.trim().toLowerCase();
   return tasks.filter((t) => (OPEN_DONE[state] ?? OPEN_DONE.all)(t)
     && (PRIO[prio] ?? PRIO.all)(t.priority)
-    && (agent === "all" || (agent === "none" ? !t.assignee : t.assignee === agent))
+    && (!agents.length || agents.includes(t.assignee || "none"))
     && (q === "" || [t.id, t.title, t.assignee ?? ""].some((s) => s.toLowerCase().includes(q))));
+}
+
+// The agent menu picks several: a pick toggles one agent ("none": tasks without one), "all" clears the picks.
+export const toggleAgent = (picked, value) => (value === "all" ? [] : picked.includes(value) ? picked.filter((x) => x !== value) : [...picked, value]);
+
+// The agent button's label: "All agents", the one picked, or how many.
+export const agentsLabel = (picked) => (!picked.length ? "All agents" : picked.length === 1 ? (picked[0] === "none" ? "no agent" : picked[0]) : `${picked.length} agents`);
+
+// The picks that apply on a board: only its agents and "none"; single agent mode (no agent names) applies none.
+export function pickedAgents(picked, agents, single) {
+  if (single || !Array.isArray(picked)) return [];
+  return picked.filter((x) => x === "none" || agents.includes(x));
 }
 
 // Hermes dispatches higher priority first, the oldest first among equals.

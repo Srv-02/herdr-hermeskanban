@@ -345,24 +345,29 @@ test("the settings dialog is ghchecker's", () => {
   assert.match(code("settings.js"), /if \(checking\(\)\) return;/);
 });
 
-// Two rows: state and a search field over the rest of the width (ghchecker's field: 24 px high), then priority, agent
-// and grouping. No row of its own for the agent menu.
-test("the filter bar: a wide search, the agent menu beside priority and grouping", () => {
+// Spec Nachträge 3: one row always shown (state, the agents menu, the search over the rest with a clear button while
+// it has text); the filter button adds a second row below a divider line with priority and grouping.
+test("the filter bar: one row always, priority and grouping behind the filter button", () => {
   const src = source("main.js"), bar = src.slice(src.indexOf("filterBar(t, agents"), src.indexOf("// ---- drawing: the list"));
-  assert.match(bar, /\.id\("search"\)\.flex_1\(\)\.min_w\(0\)\.h\(24\)/);
-  assert.doesNotMatch(bar, /\.id\("search"\)\.w\(/, "no fixed width");
-  const rows = bar.split(".child(h_flex().gap(").length - 1;
-  assert.equal(rows, 2, "two rows");
-  const second = bar.slice(bar.lastIndexOf(".child(h_flex().gap("));
-  for (const id of ["prio", "agent", "group"]) assert.match(second, new RegExp(`"${id}"`), id);
+  const rows = bar.split(".child(h_flex().gap(");
+  assert.equal(rows.length - 1, 2, "two rows");
+  const first = rows[1], second = rows[2];
+  for (const x of ['segmented("state"', 'dropButton("agent"', 'id("search").flex_1().min_w(0).h(24)', 'glyph("search"', 'id("search-clear")']) assert.ok(first.includes(x), x);
+  assert.match(first, /\.when\(typed, /, "clear only with text");
+  assert.match(first, /this\.input\.set_value\(""\); this\.query = "";/);
+  assert.match(first, /\.when\(this\.filtering, \(e\) => e\.border_b\(1\)\.border_color\(t\.border\)\)/, "divider above the second row");
+  assert.match(bar, /\.when\(this\.filtering, \(e\) => e\.child\(h_flex\(\)\.gap\(/, "the second row only with the filter button");
+  for (const x of ['segmented("prio"', 'segmented("group"']) assert.ok(second.includes(x), x);
+  assert.match(src, /\.child\(this\.filterBar\(t, agents, picked, single\)\)/, "the bar is always shown");
+  assert.match(src, /remembered\("filtering", false\)/, "closed by default, remembered");
 });
 
-// A divider line between the filter rows, over the panel's full width, as ghchecker separates its bars.
-test("the filter rows are separated by a divider line", () => {
-  const src = source("main.js"), bar = src.slice(src.indexOf("filterBar(t, agents"), src.indexOf("// ---- drawing: the list"));
-  const first = bar.slice(bar.indexOf(".child(h_flex().gap("), bar.lastIndexOf(".child(h_flex().gap("));
-  assert.match(first, /^\.child\(h_flex\(\)\.gap\(8\)\.items_center\(\)\.px\(8\)\.pt\(8\)\.pb\(6\)\.border_b\(1\)\.border_color\(t\.border\)/);
-  assert.match(bar, /return v_flex\(\)\.flex_none\(\)\.border_b\(1\)\.border_color\(t\.border\)/, "no side padding on the bar: the line spans the width");
+test("the agent menu picks several and stays open", () => {
+  const src = source("main.js"), menu = src.slice(src.indexOf("renderMenu(t) {"), src.indexOf("// Opening the panel on an instance"));
+  assert.match(menu, /m\.value = toggleAgent\(picked, value\)/);
+  assert.doesNotMatch(menu, /closeOverlay/);
+  assert.match(src, /pick\.kind === "agents" && Array\.isArray\(pick\.value\)/);
+  assert.match(src, /\["none", "no agent"\]/);
 });
 
 // Single agent mode hides agent names for that instance: row meta, grouping by agent, the overlay's top and blocked box,

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { NEEDS_YOU, OPEN_DONE, filterTasks, groupTasks, hintOf, prioLabel } from "../mods/hermes-kanban/lib/view.js";
+import { NEEDS_YOU, OPEN_DONE, filterTasks, groupTasks, hintOf, prioLabel, agentsLabel, toggleAgent, pickedAgents } from "../mods/hermes-kanban/lib/view.js";
 
 const ORDER = ["triage", "todo", "scheduled", "ready", "running", "blocked", "review", "done"];
 const t = (id, o = {}) => ({
@@ -47,19 +47,19 @@ test("groupTasks by none gives one group", () => {
 });
 
 test("filterTasks: open hides done; agent none; P3+ means priority >= 3", () => {
-  const f = (o) => filterTasks(tasks, { state: "open", query: "", agent: "all", prio: "all", ...o }).map((x) => x.id);
+  const f = (o) => filterTasks(tasks, { state: "open", query: "", agents: [], prio: "all", ...o }).map((x) => x.id);
   assert.ok(!f({}).includes("t_1"));
   assert.deepEqual(f({ state: "done" }), ["t_1"]);
   assert.equal(f({ state: "all" }).length, 6);
-  assert.deepEqual(f({ agent: "none" }), ["t_3"]);
-  assert.deepEqual(f({ agent: "analyst" }), ["t_4"]);
+  assert.deepEqual(f({ agents: ["none"] }), ["t_3"]);
+  assert.deepEqual(f({ agents: ["analyst"] }), ["t_4"]);
   assert.deepEqual(f({ prio: "p1" }), ["t_3"]);
   assert.deepEqual(f({ prio: "p2" }), ["t_5", "t_6"]);
   assert.deepEqual(f({ prio: "p3+" }), ["t_4"]);
 });
 
 test("filterTasks: query matches id, title, agent", () => {
-  const f = (query) => filterTasks(tasks, { state: "all", query, agent: "all", prio: "all" }).map((x) => x.id);
+  const f = (query) => filterTasks(tasks, { state: "all", query, agents: [], prio: "all" }).map((x) => x.id);
   assert.deepEqual(f("T_3"), ["t_3"]);
   assert.deepEqual(f("title t_4"), ["t_4"]);
   assert.deepEqual(f("ANALYST"), ["t_4"]);
@@ -181,4 +181,35 @@ test("activityOf in single agent mode names the instance for an agent's comment"
   const detail = { events: [], comments: [{ at: 2, author: "default", body: "done it" }, { at: 1, author: "herdr", body: "go" }] };
   const texts = activityOf(detail, { agents: ["default"], instance: "devbox" }).map((x) => x.text);
   assert.deepEqual(texts, ["devbox commented: done it", "herdr commented: go"]);
+});
+
+// The agent filter picks several: a task matches when its agent (or "none" for no agent) is picked; none picked = all.
+test("filterTasks: several agents, no agent among them, empty means all", () => {
+  const f = (agents) => filterTasks(tasks, { state: "all", query: "", agents, prio: "all" }).map((x) => x.id).sort();
+  const all = f([]);
+  assert.equal(all.length, 6);
+  assert.deepEqual(f(["analyst", "none"]), ["t_3", "t_4"]);
+  assert.deepEqual(f(["analyst", "coder", "none"]), all);
+  assert.deepEqual(f(["nobody"]), []);
+});
+
+test("toggleAgent: a pick toggles, All agents clears", () => {
+  assert.deepEqual(toggleAgent([], "coder"), ["coder"]);
+  assert.deepEqual(toggleAgent(["coder"], "none"), ["coder", "none"]);
+  assert.deepEqual(toggleAgent(["coder", "none"], "coder"), ["none"]);
+  assert.deepEqual(toggleAgent(["coder", "none"], "all"), []);
+});
+
+test("agentsLabel: All agents, the one name, or the count", () => {
+  assert.equal(agentsLabel([]), "All agents");
+  assert.equal(agentsLabel(["coder"]), "coder");
+  assert.equal(agentsLabel(["none"]), "no agent");
+  assert.equal(agentsLabel(["coder", "none"]), "2 agents");
+});
+
+// What applies on a board: only picks it knows (its agents and "none"); single agent mode lifts the filter.
+test("pickedAgents: unknown names drop out, single agent mode picks all", () => {
+  assert.deepEqual(pickedAgents(["coder", "gone", "none"], ["coder", "analyst"], false), ["coder", "none"]);
+  assert.deepEqual(pickedAgents(["coder"], ["coder"], true), []);
+  assert.deepEqual(pickedAgents("coder", ["coder"], false), [], "an old single value is dropped");
 });
