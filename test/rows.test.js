@@ -211,3 +211,14 @@ test("the overlay: Comment & unblock only while blocked, Ctrl+Enter comments", (
 test("single agent mode hides the agent choice in both overlays", () => {
   for (const f of ["viewer.js", "create.js"]) assert.match(code(f), /isSingleAgent\(this\.settings, this\.machine\)/, f);
 });
+
+// Untrusted task text: the description goes through safeMarkdown, raw HTML off, links only through safeLink.
+test("the overlay draws the description safely", () => {
+  const src = source("viewer.js");
+  assert.match(src, /TextView\.markdown\([^)]*, safeMarkdown\(body\)\)/);
+  assert.match(src, /\.raw_html\(false\)/);
+  assert.match(src, /\.on_link_click\(\(url\) => openUrl\(safeLink\(url\)\)\)/);
+  assert.equal([...src.matchAll(/TextView\.(markdown|html)\(/g)].length, 1, "one Markdown view, no HTML view");
+  assert.doesNotMatch(source("create.js"), /TextView/);
+  assert.match(source("ui.js"), /export function openUrl\(url\) \{\s*if \(!safeLink\(url\)\) return;/);
+});

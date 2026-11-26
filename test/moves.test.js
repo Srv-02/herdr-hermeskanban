@@ -88,12 +88,12 @@ test("commentAndUnblock sends both requests to the task's machine", async () => 
   assert.equal(r.moved.status, "ready");
 });
 
-test("mergePatched keeps the known comment count and body (PATCH has no comment_count)", () => {
-  const known = { ...blocked, comments: 3, body: "the text" };
-  const patched = { ...blocked, status: "ready", comments: 0 };
-  assert.deepEqual(mergePatched(known, patched), { ...patched, comments: 3, body: "the text" });
+test("mergePatched keeps the known comment count, body and summary (the PATCH answer has none of them)", () => {
+  const known = { ...blocked, comments: 3, body: "the text", summary: "needs input: which range?" };
+  const patched = { ...blocked, status: "ready", comments: 0, summary: null };
+  assert.deepEqual(mergePatched(known, patched), { ...patched, comments: 3, body: "the text", summary: "needs input: which range?" });
   assert.equal(mergePatched(known, null), null);
-  assert.deepEqual(mergePatched(null, patched), { ...patched, body: null });
+  assert.deepEqual(mergePatched(null, patched), { ...patched, body: null, summary: null });
 });
 
 test("failureOf: Hermes' detail, else the transport error, else the HTTP code", () => {

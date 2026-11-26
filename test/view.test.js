@@ -106,7 +106,7 @@ test("hintOf: a missing default assignee reads like an empty one", () => {
 });
 
 // ---- the task overlay ----
-import { activityOf, runLine, prioChoices } from "../mods/hermes-kanban/lib/view.js";
+import { activityOf, blockReason, runLine, prioChoices } from "../mods/hermes-kanban/lib/view.js";
 
 test("activityOf: events and comments, newest first, with the reason of a block", () => {
   const detail = {
@@ -114,18 +114,50 @@ test("activityOf: events and comments, newest first, with the reason of a block"
       { kind: "created", at: 100, payload: null },
       { kind: "claimed", at: 200, payload: { lock: "w1" } },
       { kind: "blocked", at: 400, payload: { reason: "needs input: which range?" } },
-      { kind: "spawn_failed", at: 300, payload: { error: "no binary" } },
+      { kind: "crashed", at: 300, payload: { error: "no binary" } },
     ],
     comments: [{ author: "herdr", body: "Only v2.4", at: 500 }],
   };
   assert.deepEqual(activityOf(detail), [
     { at: 500, text: "herdr commented: Only v2.4", tone: "blue" },
     { at: 400, text: "Blocked: needs input: which range?", tone: "red" },
-    { at: 300, text: "Spawn failed: no binary", tone: "red" },
+    { at: 300, text: "Crashed: no binary", tone: "red" },
     { at: 200, text: "Claimed", tone: "yellow" },
     { at: 100, text: "Created", tone: null },
   ]);
   assert.deepEqual(activityOf({ events: [], comments: [] }), []);
+});
+
+// Hermes' event kinds (kanban_db.py): no heartbeats in the list, no "commented" twice next to the comment itself.
+test("activityOf: heartbeats left out, commented events only without listed comments, status events say the status", () => {
+  const events = [
+    { kind: "heartbeat", at: 150, payload: null },
+    { kind: "commented", at: 160, payload: { author: "herdr" } },
+    { kind: "status", at: 170, payload: { status: "todo" } },
+    { kind: "spawned", at: 180, payload: null },
+    { kind: "timed_out", at: 190, payload: null },
+    { kind: "gave_up", at: 191, payload: null },
+    { kind: "reclaimed", at: 192, payload: null },
+    { kind: "completed", at: 193, payload: { summary: "notes written" } },
+  ];
+  const withComments = activityOf({ events, comments: [{ author: "herdr", body: "hi", at: 160 }] });
+  assert.deepEqual(withComments.map((a) => a.text), ["Completed: notes written", "Reclaimed", "Gave up", "Timed out", "Spawned", "Status: todo", "herdr commented: hi"]);
+  assert.deepEqual(withComments.map((a) => a.tone), [null, "red", "red", "red", "yellow", null, "blue"]);
+  const without = activityOf({ events, comments: [] });
+  assert.ok(without.some((a) => a.text === "Commented"), "a commented event shows when no comment is listed");
+  assert.ok(!without.some((a) => /heartbeat/i.test(a.text)));
+});
+
+test("blockReason: the newest blocked event's reason, then the summary, then the failure", () => {
+  const events = [
+    { kind: "blocked", at: 100, payload: { reason: "old reason" } },
+    { kind: "blocked", at: 300, payload: { reason: "needs input: which range?" } },
+    { kind: "unblocked", at: 200, payload: null },
+  ];
+  assert.equal(blockReason({ events }, { summary: "s", failure: "f" }), "needs input: which range?");
+  assert.equal(blockReason({ events: [{ kind: "blocked", at: 1, payload: null }] }, { summary: "s", failure: "f" }), "s");
+  assert.equal(blockReason(null, { summary: null, failure: "breaker: 3 crashes" }), "breaker: 3 crashes");
+  assert.equal(blockReason(null, { summary: "", failure: null }), null);
 });
 
 test("runLine: id, outcome and duration; a running run counts to now", () => {

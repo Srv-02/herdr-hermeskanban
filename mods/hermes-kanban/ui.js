@@ -4,7 +4,9 @@
 // from herdr-github by alarboulletmarin (MIT), mods/github/ui.js at 75a2b40. Only what this mod draws so far.
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
+import { exec } from "herdr";
 import { NEEDS_YOU } from "./lib/view.js";
+import { safeLink } from "./lib/markdown.js";
 
 const CLEAR = "#00000000";
 // The one color not taken from the theme: the gold of an available update (the Settings button and the dialog's box).
@@ -24,6 +26,13 @@ export function look(status, t, c, mono) {
   if (NEEDS_YOU.includes(status)) return { icon: "alert", color: c.red };
   const color = mono ? t.muted : ({ triage: c.orange, ready: c.blue, running: c.yellow, done: c.magenta }[status] ?? t.muted);
   return { icon: status === "running" ? "running" : status === "done" ? "check-circle" : "circle-dot", color };
+}
+
+// Opens a link in the browser of this computer, only an https one (lib/markdown.js safeLink) and only on a click.
+// From ghchecker (MIT), mods/ghchecker/ui.js openUrl.
+export function openUrl(url) {
+  if (!safeLink(url)) return;
+  exec("open", [url]).catch(() => exec("xdg-open", [url]).catch(() => null));
 }
 
 // A theme color with an alpha, for tinted layers. Only #rrggbb gets one.

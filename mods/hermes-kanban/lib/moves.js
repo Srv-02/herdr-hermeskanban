@@ -45,9 +45,9 @@ export async function commentAndUnblock(api, task, text) {
   }
 }
 
-// The task after a PATCH: Hermes' answer, but the PATCH task dict has no comment_count and no body, so a known
-// count and body stay.
+// The task after a PATCH: Hermes' answer, but the PATCH task dict has no comment_count, body or latest_summary, so
+// a known count, body and summary stay.
 export function mergePatched(known, patched) {
   if (!patched) return null;
-  return { ...patched, comments: known?.comments ?? patched.comments, body: known?.body ?? null };
+  return { ...patched, comments: known?.comments ?? patched.comments, body: known?.body ?? null, summary: patched.summary ?? known?.summary ?? null };
 }

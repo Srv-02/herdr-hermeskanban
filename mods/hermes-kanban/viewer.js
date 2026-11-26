@@ -9,12 +9,13 @@
 import { div } from "gpui-kit";
 import { v_flex, h_flex, TextView, TextareaState, Textarea } from "gpui-base";
 import { theme, closeOverlay, shared, setShared, exec, checking, readTextFile, appHome } from "herdr";
-import { tones, alpha, glyph, glyphOf, segmented, button, pill, look } from "./ui.js";
+import { tones, alpha, glyph, glyphOf, segmented, button, pill, look, openUrl } from "./ui.js";
+import { safeMarkdown, safeLink } from "./lib/markdown.js";
 import { createApi } from "./lib/api.js";
 import { normalizeDetail } from "./lib/board.js";
 import { allowedMoves, outcomeText, commentAndUnblock, mergePatched, failureOf } from "./lib/moves.js";
 import { loadSettings, isSingleAgent } from "./lib/settings.js";
-import { activityOf, runLine, prioChoices, prioLabel } from "./lib/view.js";
+import { activityOf, blockReason, runLine, prioChoices, prioLabel } from "./lib/view.js";
 import { ago } from "./lib/time.js";
 
 const CLEAR = "#00000000";
@@ -192,7 +193,7 @@ export class TaskViewer {
 
   // ---- the left column ----
   blockedBox(task, t, c) {
-    const reason = task.summary || task.failure || "Hermes gave no reason.";
+    const reason = blockReason(this.detail, task) ?? "Hermes gave no reason.";
     return v_flex().flex_none().gap(6).px(14).py(12).rounded(9).border_1().border_color(alpha(c.red, "73")).bg(alpha(c.red, "14"))
       .child(div().font_semibold().text_color(c.red).child(task.assignee ? `${task.assignee} is blocked` : "Blocked"))
       .child(div().text_color(t.foreground).child(reason))
@@ -200,12 +201,14 @@ export class TaskViewer {
         .child(`Answer as a comment, then unblock.${task.assignee ? " The agent continues with the next dispatch." : ""}`));
   }
 
+  // The body is untrusted (anyone who reaches the instance can write a task): safeMarkdown drops images and raw
+  // HTML, raw_html(false) keeps any rest literal, and a click opens only an https link.
   description(task, t) {
     const body = task?.body?.trim();
     return v_flex().flex_none().rounded(9).border_1().border_color(t.border).overflow_hidden()
       .child(h_flex().h(36).px(12).items_center().bg(t.raised).text_size(12).text_color(t.muted).child("Description"))
       .child(div().px(14).py(12).child(!this.detail ? div().text_color(t.muted).child("Loading…")
-        : body ? TextView.markdown(`body-${this.id}`, body).selectable(true) : div().italic().text_color(t.muted).child("No description.")));
+        : body ? TextView.markdown(`body-${this.id}`, safeMarkdown(body)).raw_html(false).selectable(true).on_link_click((url) => openUrl(safeLink(url))) : div().italic().text_color(t.muted).child("No description.")));
   }
 
   activity(t, c) {

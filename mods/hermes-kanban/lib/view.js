@@ -48,20 +48,33 @@ export const prioLabel = (n) => (n > 0 ? `P${n}` : null);
 
 // ---- the task overlay ----
 
-const RED_EVENTS = new Set(["blocked", "crashed", "timed_out", "gave_up", "spawn_failed", "failed", "reclaimed"]);
-const YELLOW_EVENTS = new Set(["claimed", "started", "running", "spawned"]);
+// Hermes' event kinds (kanban_db.py): crashed, timed_out, gave_up, reclaimed, blocked, claimed, spawned, status,
+// unblocked, completed, assigned, reprioritized, promoted, heartbeat, commented. Others show as their kind.
+const RED_EVENTS = new Set(["blocked", "crashed", "timed_out", "gave_up", "reclaimed"]);
+const YELLOW_EVENTS = new Set(["claimed", "spawned"]);
 const sentence = (kind) => { const s = kind.replace(/_/g, " "); return s.charAt(0).toUpperCase() + s.slice(1); };
 // The reason an event carries, if it carries one.
 const reasonOf = (p) => [p?.reason, p?.summary, p?.error].find((x) => typeof x === "string" && x.trim()) ?? null;
 
-// The activity of a task (normalizeDetail): its events and comments in one list, newest first.
+// The activity of a task (normalizeDetail): its events and comments in one list, newest first. Heartbeats stay out;
+// a "commented" event only when the comments themselves are not listed (else it would show twice).
 export function activityOf(detail) {
-  const events = (detail.events ?? []).map((e) => {
+  const comments = detail.comments ?? [];
+  const events = (detail.events ?? []).filter((e) => e.kind !== "heartbeat" && !(e.kind === "commented" && comments.length)).map((e) => {
+    if (e.kind === "status" && typeof e.payload?.status === "string") return { at: e.at, text: `Status: ${e.payload.status}`, tone: null };
     const why = reasonOf(e.payload);
     return { at: e.at, text: why ? `${sentence(e.kind)}: ${why}` : sentence(e.kind), tone: RED_EVENTS.has(e.kind) ? "red" : YELLOW_EVENTS.has(e.kind) ? "yellow" : null };
   });
-  const comments = (detail.comments ?? []).map((c) => ({ at: c.at, text: `${c.author || "someone"} commented: ${c.body}`, tone: "blue" }));
-  return [...events, ...comments].sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
+  const said = comments.map((c) => ({ at: c.at, text: `${c.author || "someone"} commented: ${c.body}`, tone: "blue" }));
+  return [...events, ...said].sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
+}
+
+// Why a task is blocked: the reason of its newest "blocked" event, else latest_summary, else last_failure_error
+// (a task parked by the breaker has no event). Null when none says.
+export function blockReason(detail, task) {
+  const last = (detail?.events ?? []).filter((e) => e.kind === "blocked").sort((a, b) => (b.at ?? 0) - (a.at ?? 0))[0];
+  const reason = typeof last?.payload?.reason === "string" && last.payload.reason.trim() ? last.payload.reason : null;
+  return reason || task?.summary || task?.failure || null;
 }
 
 // One run of the overlay's list: "#7 blocked · 4m 12s"; a run still going counts to now.
