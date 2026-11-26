@@ -162,7 +162,7 @@ test("the needs-you strip jumps with fresh spaces and panes", () => {
 
 test("the panel never falls back to the last board outside of Hermes", () => {
   const src = source("main.js");
-  assert.match(src, /"No Hermes in this pane"/);
+  assert.match(src, /"No Hermes on this machine"/);
   assert.match(src, /if \(!focus\.hermes\)/);
 });
 

@@ -168,7 +168,7 @@ export class SettingsDialog {
     const about = (text, color = null) => v_flex().gap(3).child(help(t, text, color))
       .when(Boolean(r.note), (e) => e.child(help(t, r.note, c.green)))
       .when(Boolean(r.error), (e) => e.child(help(t, r.error, c.red)));
-    if (!m) return row(t, "settings-access", title, help(t, "Open the settings from a Hermes pane to manage its access."), [], true);
+    if (!m) return row(t, "settings-access", title, help(t, "Open the settings from a pane on a machine that runs Hermes to manage its access."), [], true);
     if (this.mode === "open") return row(t, "settings-access", title, help(t, `Hermes on ${m} runs without sign-in. Hermes Kanban uses the web app's own token there and set up nothing.`), [], true);
     if (this.mode !== "gated") return row(t, "settings-access", title, help(t, `The gateway on ${m} has not answered yet.`), [], true);
     if (r.phase === "probing") return row(t, "settings-access", title, about(`Reading ${m}…`), [working(t, "Reading…")], true);
@@ -250,7 +250,7 @@ export class SettingsDialog {
     const single = m
       ? row(t, "settings-single_agent", "Single agent mode", help(t, `Hides the agent names, filter and picker on ${m}. New tasks from this panel go to its default agent.`),
         [toggle(t, "settings-single_agent-switch", on, (_e, cx) => this.set("single_agent", on ? list.filter((x) => x !== m) : [...list, m], cx))])
-      : row(t, "settings-single_agent", "Single agent mode", help(t, "Per instance. Open the settings from a Hermes pane to set it for that instance."), []);
+      : row(t, "settings-single_agent", "Single agent mode", help(t, "Per instance. Open the settings from a pane on a machine that runs Hermes to set it for that instance."), []);
     // Hermes' resolved default: kanban.default_assignee, else its active profile (lib/poller.js).
     const snap = this.snap(), configured = snap?.defaultAssignee ?? "", assignee = snap?.resolvedAssignee || configured;
     const source = configured ? "Set in Hermes (kanban.default_assignee)" : "Hermes' active profile (kanban.default_assignee is not set)";

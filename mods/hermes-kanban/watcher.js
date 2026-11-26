@@ -43,10 +43,10 @@ async function once(w) {
     if (typeof refresh.machine === "string") w.poller.refresh(refresh.machine);
   }
 
-  // Where a toast's click goes: the Hermes pane last focused on its machine.
+  // Where a toast's click goes: the terminal pane last focused on its machine (a shell pane there as well).
   const view = { spaces: spaces(), panes: panes() };
   const before = shared("hermes-kanban.lastPanes") ?? {};
-  const lastPanes = rememberPane(before, focusedInstance({ ...view, focused: focused() }), view.panes);
+  const lastPanes = rememberPane(before, focusedInstance({ ...view, focused: focused(), boards: shared("hermes-kanban.boards") }), view.panes);
   if (lastPanes !== before) setShared("hermes-kanban.lastPanes", lastPanes);
 
   const machines = visibleMachines(view.spaces);

@@ -1,15 +1,12 @@
 # Hermes Kanban
 
-![Hermes Kanban: the Kanban board of the Hermes agent in the focused pane, in a Herdr panel](preview.png)
+![Hermes Kanban: the Kanban board of the Hermes agent on the focused pane's machine, in a Herdr panel](preview.png)
 
-**A Kanban panel for the [Herdr app](https://herdr.dev): it follows the focused pane and shows the board of the Hermes agent running there.**
+**See and steer the Kanban board of your Hermes agents, right inside the [Herdr app](https://herdr.dev).**
 
-- **Follows your pane:** focus a pane that runs Hermes and the panel shows that instance's board at once, while it syncs in the background.
-- **One board at a time:** every instance keeps its own board; tasks of two machines never mix, and an action goes only to the machine its task came from.
-- **Steer tasks:** move a task, set its priority, assign it, comment, unblock or archive it, and create new ones, right from the panel.
-- **Hears back:** a toast tells you when a task finishes, needs you or fails, and a click jumps to the pane; a dot on the tab bar button shows what you have not seen yet.
-- **Stays on the machine:** the access key never leaves the Hermes machine, never shows up in a command line and never reaches your Mac.
-- **Quiet:** a cheap check of the board's timestamp every 30 s, the board itself only when it changed, and a gateway restart never floods you with toasts.
+Click into any pane on a machine that runs Hermes, and the panel shows that Hermes' tasks. Move them, comment, unblock or create new ones without leaving Herdr. When a task needs you, fails or finishes, Herdr tells you, even while the panel is closed.
+
+To start, install the mod (see below), focus a pane on your Hermes machine and click `Hermes` in the tab bar.
 
 <br>
 
@@ -25,66 +22,106 @@ In Herdr, ask your agent:
 Read ~/.config/herdr-app/AGENTS.md, then add this mod: https://github.com/Srv-02/herdr-hermeskanban/tree/main
 ```
 
-Then click `Hermes` in the tab bar.
+Then focus a pane on a machine that runs Hermes and click `Hermes` in the tab bar.
 
-- **Needs** Herdr on macOS, Hermes Agent 0.23.4 or newer on a Linux machine that Herdr reaches as one of its machines, and `curl` 7.55 or newer there.
-- **Update:** the gear turns gold when a new release is out; ask your agent the same way.
-- **By hand, removing, keys:** see the [guide](docs/GUIDE.md#install).
+You need:
+
+- Herdr on macOS.
+- Hermes Agent 0.23.4 or newer, on a Linux machine that Herdr reaches as one of its machines.
+- `curl` 7.55 or newer on that Linux machine.
+
+The [guide](docs/GUIDE.md#requirements) lists every detail.
+
+- **Updating:** the gear in the panel turns gold when a new version is out. Ask your agent to update the mod, the same way you installed it. See [Updates](docs/GUIDE.md#updates).
+- **Install by hand or remove the mod:** see [Manual install](docs/GUIDE.md#manual-install) and [Removing](docs/GUIDE.md#removing).
 
 ## Features
 
 ### Board
 
-- **Grouped as in Hermes:** Triage, Todo, Scheduled, Ready, Running, Blocked, Review, Done, in Hermes' own order and colors; empty groups are left out. Or grouped by agent, or not at all.
-- **Sorted as Hermes dispatches:** the highest priority first, the oldest first among equals.
-- **Each row:** status, title, `t_a1b2 · writer · 14m`, and a hint: why a task is blocked, `starts with next dispatch`, or `no agent, will not start`; comments and priority on the right.
-- **Filter:** `Open | Done | All`, one or more agents, and a search over ID, title and agent. The funnel adds priority (`All | P1 | P2 | P3+`) and grouping.
-- **Status bar:** `3 running · 1 problem`, the gateway's dot and the Hermes version.
+- The panel always shows the Hermes of the machine you are on. Any pane there works, a plain shell too.
+- Tasks are grouped as in Hermes: Triage, Todo, Scheduled, Ready, Running, Blocked, Review, Done.
+- You can also group them by agent, or not at all.
+- The most important tasks come first.
+- Each row tells you what is going on, for example why a task is blocked.
+- Filter by open or done tasks, by agent, by priority, or search by text.
+- The bar at the bottom shows how many tasks run and whether Hermes is up.
+
+More in the guide: [The board](docs/GUIDE.md#the-board).
 
 ![The board of devbox grouped by status](screenshots/board.png)
 
 ### Task overlay
 
-- **The task:** its status, agent and age, the blocked reason in a red box, the description and the activity: events and comments, newest first.
-- **Act on it:** comment, or **Comment & unblock** a blocked task; assign an agent; **Move to** only what Hermes allows from the current status; set the priority; archive with a second click to confirm.
-- **Hermes has the last word:** the line at the bottom tells where the task really went (`Hermes moved it to Ready`), not where it was sent.
-- **New task:** the `+` in the header asks for a title, a description, a priority and an agent, on the instance the panel shows.
+- Click a task to open it in a large window.
+- You see its description, its history and its comments.
+- A blocked task shows why it is blocked, in a red box.
+- Write a comment, or comment and unblock the task in one step.
+- Assign an agent, change the priority or move the task. You only see the moves that Hermes allows.
+- Archive a task. A second click confirms it. The mod never deletes a task.
+- The `+` button in the header creates a new task.
+
+More in the guide: [Task overlay](docs/GUIDE.md#task-overlay).
 
 ![A blocked task in its overlay](screenshots/overlay.png)
 
 ### Notifications
 
-- **Toasts** when a task needs you (blocked, waiting for review, cycling between blocked and unblocked), fails or finishes: `devbox: writer needs input`. A click jumps to that instance's Hermes pane.
-- **The dot** on the `Hermes` button: red for something new that needs you, green for something newly done; opening the panel on that instance clears it. No dot for tasks that just stay blocked or agents that run.
-- **Other instances:** a red strip `labbox needs you` with `Go to pane →` under the header when another visible instance has news for you.
-- **Sounds** and a Dock badge, each with its own switch.
+- A toast tells you when a task needs you, fails or finishes.
+- Click the toast to jump to that machine. You land in the pane you used there last.
+- The `Hermes` button in the tab bar carries a dot for news you have not seen yet.
+- A red dot means something needs you. A green dot means a task is done.
+- Opening the panel for that Hermes clears its dot.
+- You can also get sounds and a dot on the Dock icon. Each has its own switch.
+
+**What a click on the `Hermes` button does:**
+
+- On a pane of a machine that runs Hermes, it opens or closes the panel.
+- On any other pane, the button is grey. Its tooltip says `No Hermes on this machine`. Panes on your Mac count as such.
+- If the panel is open there, a click still closes it.
+- When another Hermes needs you, the tooltip says `Go to labbox`, for example. One click jumps to that machine and opens the panel there. This works from any pane.
+- Inside the panel, a red strip `labbox needs you` with `Go to pane →` does the same.
+
+More in the guide: [Notifications](docs/GUIDE.md#notifications).
 
 ![The strip for another instance that needs you and the dot on the Hermes button](screenshots/notifications.png)
 
 ### Set up access
 
-- **An instance that signs people in** needs a key of Hermes Kanban's own. **Set up access** lists every step, asks, writes a key and a systemd drop-in on that machine, and waits.
-- **No restart without you:** the gateway restarts only when you click **Restart gateway**; then the panel checks the key and shows the board.
-- **Remove access** in the settings undoes it in a safe order: the drop-in, then a restart on your click, then the key.
-- **An instance without sign-in** needs nothing: the panel uses the web app's own token there.
+- Some Hermes setups ask people to sign in. The panel then needs a key of its own.
+- Click **Set up access**. The panel shows every step first and runs them only after you confirm.
+- The Hermes gateway restarts only when you click **Restart gateway**.
+- The key stays on the Hermes machine. It never reaches your Mac.
+- **Remove access** in the settings undoes everything, step by step.
+- Without sign-in, there is nothing to set up.
+
+More in the guide: [Set up access](docs/GUIDE.md#set-up-access) and [Remove access](docs/GUIDE.md#remove-access).
 
 ### Settings
 
-- **The gear** opens the settings: single agent mode for the shown instance (agent names, filter and picker disappear), status colors, toasts, sounds, the Dock badge and how often to check.
-- **Updates:** once a day the panel asks GitHub for a new release. The gear turns gold when one is out, and the dialog tells you what to ask your agent.
+- The gear in the panel header opens the settings.
+- Choose status colors, toasts, sounds, the Dock dot and how often the panel checks for news.
+- Single agent mode hides agent names for a Hermes with only one agent.
+- Once a day the panel checks GitHub for a new version. You can switch that off.
+
+More in the guide: [Settings](docs/GUIDE.md#settings) and [Single agent mode](docs/GUIDE.md#single-agent-mode).
 
 ![The Settings dialog](screenshots/settings.png)
 
 ### And
 
-- **Follow me, strictly:** a pane without Hermes shows `No Hermes in this pane`, never the last board. Clicking into the panel keeps the board.
-- **Only what you have open:** a machine counts while it has at least one open space; close its last space and its board, dot and toasts go.
-- **Safe text:** titles, descriptions and comments from Hermes show as plain text; only `https` links open, and only on a click.
-- **After a Hermes update** that changes the board's shape, the panel says `Hermes <version> not supported yet` instead of showing wrong data.
+- Each Hermes keeps its own board. Tasks of two machines never mix.
+- On a machine without Hermes, the panel says `No Hermes on this machine`. It never shows an old board.
+- Clicking into the panel, for example into the search, keeps the board.
+- A machine counts only while it has an open space in Herdr.
+- Text from Hermes shows as plain text. Links open only when you click them.
+- If a new Hermes version changes its board, the panel says so instead of showing wrong data.
+- You can bind keys to the panel's commands. See [Keys](docs/GUIDE.md#keys).
 
 ## Documentation
 
-- **[Guide](docs/GUIDE.md):** every feature, setting and key in detail, and what it runs.
+- **[Guide](docs/GUIDE.md):** every feature, setting and key in detail.
+- **[What it runs and touches](docs/GUIDE.md#what-it-runs-and-touches):** every command on the Hermes machine and every file on your Mac.
 - **[RECIPE.md](RECIPE.md):** the mod as a brief to build it from scratch.
 - **[Development](docs/GUIDE.md#development):** tests and lint.
 
