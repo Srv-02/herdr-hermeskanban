@@ -24,8 +24,9 @@ export function tones(t) {
 // checked, the others a dot. Mono draws everything else in the theme's muted color. `c` is tones(t).
 export function look(status, t, c, mono) {
   if (NEEDS_YOU.includes(status)) return { icon: "alert", color: c.red };
-  // Triage in the dim grey, as Hermes' own board (its tertiary text color).
-  const color = mono ? t.muted : ({ triage: t.dim, ready: c.blue, running: c.yellow, done: c.magenta }[status] ?? t.muted);
+  // As Hermes' own board (COLUMN_META): triage and done in the dim grey (its tertiary text), todo muted (secondary),
+  // scheduled violet, ready blue, running green; review joins blocked in red (needs you).
+  const color = mono ? t.muted : ({ triage: t.dim, scheduled: c.magenta, ready: c.blue, running: c.green, done: t.dim }[status] ?? t.muted);
   return { icon: status === "running" ? "running" : status === "done" ? "check-circle" : "circle-dot", color };
 }
 

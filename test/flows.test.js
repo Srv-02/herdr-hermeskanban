@@ -310,3 +310,13 @@ test("status colors: triage grey as in Hermes", async () => {
   assert.equal(look("triage", t, c, false).color, t.dim);
   assert.equal(look("todo", t, c, false).color, t.muted);
 });
+
+// The rest as Hermes' board too: scheduled violet, ready blue, running green, done grey; review stays red with blocked
+// (red means needs you); mono unchanged.
+test("status colors: as Hermes' board, review red", async () => {
+  const { look } = await import("../mods/hermes-kanban/ui.js");
+  const t = { muted: "#999999", dim: "#666666" }, c = { red: "#ff0000", green: "#00ff00", blue: "#0000ff", yellow: "#ffff00", magenta: "#ff00ff", orange: "#ff8800" };
+  const color = (s, mono = false) => look(s, t, c, mono).color;
+  assert.deepEqual(["scheduled", "ready", "running", "done", "blocked", "review"].map((s) => color(s)), [c.magenta, c.blue, c.green, t.dim, c.red, c.red]);
+  assert.deepEqual(["scheduled", "running", "done", "review"].map((s) => color(s, true)), [t.muted, t.muted, t.muted, c.red]);
+});
