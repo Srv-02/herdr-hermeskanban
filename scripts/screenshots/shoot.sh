@@ -24,10 +24,13 @@ W=860
 H_HERO=600 H_BOARD=657 H_NOTIFY=689
 # The overlay and the dialog get windows of their own: the task overlay is 0.9 H tall, the settings dialog 0.9 H.
 H_OVERLAY=896 H_DIALOG=940
-# Boxes in raw pixels "y x width height", measured on the first raw shots: the toast of the notifications scene and the
-# Hermes button at the right end of the tab bar. Check both on tmp/shots-raw/notifications.png after a new layout.
-TOAST_BOX="$((2 * H_NOTIFY - 300)) 968 720 160"
-BUTTON_BOX="0 $((2 * W - 184)) 184 84"
+# Boxes in raw pixels "y x width height", measured on the raw shots: the toast of the notifications scene (it lies over the
+# bottom of the panel, and the card puts it back there) and the Hermes button at the right end of the tab bar, the task
+# overlay and the settings dialog. Check them on tmp/shots-raw/*.png after a new layout.
+TOAST_BOX="$((2 * H_NOTIFY - 176)) 1008 682 145"
+BUTTON_BOX="12 1542 160 58"
+OVERLAY_BOX="90 104 1512 1612"
+DIALOG_BOX="95 241 1238 1690"
 CARDS="hero board overlay notifications settings"
 ONLY="$*"
 for w in $ONLY; do
@@ -98,12 +101,20 @@ box() { sips -c "$5" "$4" --cropOffset "$2" "$3" "$RAW/$1.png" --out "$C/$6.png"
 render() { "$S/render.sh" "$C/$1.html" "$2" "$3" "$4" > /dev/null; }
 mkdir -p "$ROOT/screenshots"
 # The hero: 1022 x 572, as Filer Pro's and GitHub Checker's.
-if want hero && [ -f "$RAW/hero.png" ]; then panel hero $H_HERO hero-panel; render hero "$ROOT/preview.png" 1022 572; fi
+# The hero panel ends after its last whole row (Mirror the docs) and joins the status bar; the card stacks both. sips
+# ignores a crop offset of 0 and one that reaches the last row, so a crop starts at row 1 and ends one row early.
+if want hero && [ -f "$RAW/hero.png" ]; then
+  panel hero $H_HERO hero-panel
+  sips -c 920 888 --cropOffset 1 0 "$C/hero-panel.png" --out "$C/hero-panel-top.png" > /dev/null
+  sips -c 60 888 --cropOffset $((2 * H_HERO - 237)) 0 "$C/hero-panel.png" --out "$C/hero-panel-foot.png" > /dev/null
+  render hero "$ROOT/preview.png" 1022 572
+fi
 # The feature cards: as wide as the hero, each shot at its own size (2x) with 60 above and below; a panel card is H + 32 tall.
 if want board && [ -f "$RAW/board.png" ]; then panel board $H_BOARD board-panel; render board "$ROOT/screenshots/board.png" 1022 $((H_BOARD + 32)); fi
 if want overlay && [ -f "$RAW/overlay.png" ]; then
   # The whole task overlay, down to its comment box.
-  box overlay 91 105 1510 1444 overlay; render overlay "$ROOT/screenshots/overlay.png" 1022 842
+  # shellcheck disable=SC2086
+  box overlay $OVERLAY_BOX overlay; render overlay "$ROOT/screenshots/overlay.png" 1022 926
 fi
 if want notifications && [ -f "$RAW/notifications.png" ]; then
   panel notifications $H_NOTIFY notifications-panel
@@ -114,6 +125,7 @@ if want notifications && [ -f "$RAW/notifications.png" ]; then
   render notifications "$ROOT/screenshots/notifications.png" 1022 $((H_NOTIFY + 32))
 fi
 if want settings && [ -f "$RAW/settings-dialog.png" ]; then
-  box settings-dialog 96 242 1236 1688 settings-dialog; render settings "$ROOT/screenshots/settings.png" 1022 964
+  # shellcheck disable=SC2086
+  box settings-dialog $DIALOG_BOX settings-dialog; render settings "$ROOT/screenshots/settings.png" 1022 965
 fi
 echo "rendered into screenshots/ and preview.png. Look at every image before you commit it: no user name, no real path, no real host."

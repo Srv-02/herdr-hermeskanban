@@ -1,5 +1,7 @@
 # Hermes Kanban
 
+![Hermes Kanban: the Kanban board of the Hermes agent in the focused pane, in a Herdr panel](preview.png)
+
 **A Kanban panel for the [Herdr app](https://herdr.dev): it follows the focused pane and shows the board of the Hermes agent running there.**
 
 - **Follows your pane:** focus a pane that runs Hermes and the panel shows that instance's board at once, while it syncs in the background.
@@ -39,6 +41,8 @@ Then click `Hermes` in the tab bar.
 - **Filter:** `Open | Done | All`, one or more agents, and a search over ID, title and agent. The funnel adds priority (`All | P1 | P2 | P3+`) and grouping.
 - **Status bar:** `3 running · 1 problem`, the gateway's dot and the Hermes version.
 
+![The board of devbox grouped by status](screenshots/board.png)
+
 ### Task overlay
 
 - **The task:** its status, agent and age, the blocked reason in a red box, the description and the activity: events and comments, newest first.
@@ -46,12 +50,16 @@ Then click `Hermes` in the tab bar.
 - **Hermes has the last word:** the line at the bottom tells where the task really went (`Hermes moved it to Ready`), not where it was sent.
 - **New task:** the `+` in the header asks for a title, a description, a priority and an agent, on the instance the panel shows.
 
+![A blocked task in its overlay](screenshots/overlay.png)
+
 ### Notifications
 
 - **Toasts** when a task needs you (blocked, waiting for review, cycling between blocked and unblocked), fails or finishes: `devbox: writer needs input`. A click jumps to that instance's Hermes pane.
 - **The dot** on the `Hermes` button: red for something new that needs you, green for something newly done; opening the panel on that instance clears it. No dot for tasks that just stay blocked or agents that run.
 - **Other instances:** a red strip `labbox needs you` with `Go to pane →` under the header when another visible instance has news for you.
 - **Sounds** and a Dock badge, each with its own switch.
+
+![A toast, the strip for another instance and the dot on the Hermes button](screenshots/notifications.png)
 
 ### Set up access
 
@@ -64,6 +72,8 @@ Then click `Hermes` in the tab bar.
 
 - **The gear** opens the settings: single agent mode for the shown instance (agent names, filter and picker disappear), status colors, toasts, sounds, the Dock badge and how often to check.
 - **Updates:** once a day the panel asks GitHub for a new release. The gear turns gold when one is out, and the dialog tells you what to ask your agent.
+
+![The Settings dialog](screenshots/settings.png)
 
 ### And
 
