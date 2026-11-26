@@ -345,16 +345,20 @@ test("the settings dialog is ghchecker's", () => {
   assert.match(code("settings.js"), /if \(checking\(\)\) return;/);
 });
 
-// Two rows: state and a search field over the rest of the width (ghchecker's field: 24 px high), then priority, agent
-// and grouping. No row of its own for the agent menu.
-test("the filter bar: a wide search, the agent menu beside priority and grouping", () => {
+// The filter bar as ghchecker's: px 8, py 6, rows 6 apart; first the search field (24 px, px 8, radius 6, a border,
+// no icon) with the agent menu beside it as ghchecker's sort menu, then the segmented rows. No row of its own for the
+// agent menu.
+test("the filter bar is ghchecker's", () => {
   const src = source("main.js"), bar = src.slice(src.indexOf("filterBar(t, agents"), src.indexOf("// ---- drawing: the list"));
-  assert.match(bar, /\.id\("search"\)\.flex_1\(\)\.min_w\(0\)\.h\(24\)/);
-  assert.doesNotMatch(bar, /\.id\("search"\)\.w\(/, "no fixed width");
-  const rows = bar.split(".child(h_flex().gap(").length - 1;
-  assert.equal(rows, 2, "two rows");
-  const second = bar.slice(bar.lastIndexOf(".child(h_flex().gap("));
-  for (const id of ["prio", "agent", "group"]) assert.match(second, new RegExp(`"${id}"`), id);
+  assert.match(bar, /v_flex\(\)\.flex_none\(\)\.px\(8\)\.py\(6\)\.gap\(6\)\.border_b\(1\)\.border_color\(t\.border\)/);
+  assert.match(bar, /div\(\)\.id\("search"\)\.flex_1\(\)\.min_w\(0\)\.h\(24\)\.px\(8\)\.flex\(\)\.items_center\(\)\.rounded\(6\)\.border_1\(\)\.border_color\(t\.border\)\.cursor_text\(\)/);
+  assert.match(bar, /Input\.new\(this\.input\)\.w_full\(\)\.h_full\(\)\.text_size\(12\)/);
+  assert.doesNotMatch(bar, /glyph\("search"/);
+  const first = bar.slice(bar.indexOf('id("search")'), bar.indexOf("segmented("));
+  assert.match(first, /dropButton\("agent"/, "the agent menu sits beside the search");
+  for (const id of ["state", "prio", "group"]) assert.match(bar, new RegExp(`segmented\\("${id}"`), id);
+  assert.match(src, /dropButton\(id, label, t, onClick\) \{\n    return h_flex\(\)\.id\(id\)\.h\(24\)\.px\(8\)\.gap\(4\)\.flex_none\(\)\.items_center\(\)\.rounded\(6\)\.text_size\(12\)\.text_color\(t\.muted\)/);
+  assert.match(src, /id\("status-bar"\)\.h\(30\)\.flex_none\(\)\.px\(14\)/, "status bar padding as the header");
 });
 
 // Single agent mode hides agent names for that instance: row meta, grouping by agent, the overlay's top and blocked box,
