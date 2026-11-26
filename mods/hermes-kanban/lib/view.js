@@ -16,7 +16,7 @@ export function filterTasks(tasks, { state, query, agent, prio }) {
 }
 
 // Hermes dispatches higher priority first, the oldest first among equals.
-const byUrgency = (a, b) => b.priority - a.priority || (a.createdAt ?? Infinity) - (b.createdAt ?? Infinity);
+const byUrgency = (a, b) => (b.priority ?? 0) - (a.priority ?? 0) || (a.createdAt ?? Infinity) - (b.createdAt ?? Infinity);
 
 // Groups without tasks are left out. `labels` (normalizeWorkflow().labels) is optional: the key shows without one.
 export function groupTasks(tasks, by, order, labels = {}) {
@@ -38,7 +38,7 @@ export function hintOf(task, defaultAssignee) {
   if (task.status === "blocked") return { text: task.summary || task.failure || "blocked", tone: "red" };
   if (task.status !== "ready") return null;
   if (task.assignee) return { text: "starts with next dispatch", tone: "blue" };
-  if (defaultAssignee === "") return { text: "no agent, will not start", tone: "orange" };
+  if (!defaultAssignee) return { text: "no agent, will not start", tone: "orange" };
   return { text: `goes to ${defaultAssignee}`, tone: "blue" };
 }
 

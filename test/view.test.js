@@ -94,3 +94,13 @@ test("NEEDS_YOU and OPEN_DONE", () => {
   assert.ok(OPEN_DONE.open(t("a")) && !OPEN_DONE.open(t("a", { status: "done" })));
   assert.ok(OPEN_DONE.done(t("a", { status: "done" })) && OPEN_DONE.all(t("a")));
 });
+
+test("groupTasks: a task without createdAt sorts after dated ones of equal priority", () => {
+  const list = [t("t_n", { createdAt: null }), t("t_new", { createdAt: 200 }), t("t_old", { createdAt: 10 })];
+  assert.deepEqual(groupTasks(list, "none", ORDER)[0].tasks.map((x) => x.id), ["t_old", "t_new", "t_n"]);
+});
+
+test("hintOf: a missing default assignee reads like an empty one", () => {
+  const readyNoAgent = t("a", { status: "ready" });
+  for (const d of [null, undefined]) assert.deepEqual(hintOf(readyNoAgent, d), { text: "no agent, will not start", tone: "orange" });
+});
