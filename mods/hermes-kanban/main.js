@@ -1,25 +1,48 @@
 // Hermes Kanban: the Kanban board of the Hermes instance in the focused pane, as a side panel, and a button in the
 // tab bar that tells when an agent finished or needs you.
-// One mod, several roles by props, as ghchecker: the panel (none) and its button in the tab bar ({ button: true }).
-// The button's block is always in the layout, so it carries the watcher (watcher.js): it polls every visible instance
-// also while the panel is hidden, and runs the daily update check.
+// One mod, several roles by props, as ghchecker: the panel (none), its button in the tab bar ({ button: true }), and
+// as overlays of the panel the task ({ task }), the new task ({ create }), the settings ({ settings: true }) and the
+// small menus ({ menu }). The button's block is always in the layout, so it carries the watcher (watcher.js): it polls
+// every visible instance also while the panel is hidden, and runs the daily update check. The panel only reads what
+// the watcher shares (hermes-kanban.boards) and follows the focused pane.
 import { View, div } from "gpui-kit";
-import { v_flex, h_flex } from "gpui-base";
-import { layout, theme, props, shared, setShared, run, checking, readTextFile, appHome } from "herdr";
+import { v_flex, h_flex, InputState, Input, v_virtual_list, Scrollbar } from "gpui-base";
+import { spaces, panes, focused, layout, theme, openOverlay, closeOverlay, props, shared, setShared, run, nextCommand, checking, readTextFile, appHome, window as hostWindow } from "herdr";
 import { watchPass } from "./watcher.js";
-import { tones, alpha, glyph } from "./ui.js";
+import { tones, alpha, glyph, glyphOf, segmented, chip, blankslate, GOLD } from "./ui.js";
 import { dotOf, boardsOf } from "./lib/changes.js";
-import { loadSettings } from "./lib/settings.js";
-import { createUpdateGate, updateCheck, fetchLatest, localVersion } from "./lib/update.js";
+import { loadSettings, defaults, isSingleAgent } from "./lib/settings.js";
+import { createUpdateGate, updateCheck, fetchLatest, localVersion, gearState } from "./lib/update.js";
 import { leaseNext } from "./lib/lease.js";
+import { focusedInstance, visibleMachines, jumpTarget, rememberPane } from "./lib/instances.js";
+import { filterTasks, groupTasks, hintOf, prioLabel, NEEDS_YOU } from "./lib/view.js";
+import { taskKey } from "./lib/board.js";
+import { ago } from "./lib/time.js";
 
 const MOD = "hermes-kanban";
 const WATCH = 5000; // the watcher's beat; each instance is polled on its own pace (poll_seconds) within it
+const TICK = 3000;  // how often the panel looks at the focused pane (follow me, as ghchecker)
+const ROW = 46, HEADING = 32;
+// Hermes' column order (hermes_cli/kanban_workflow.py), for a board whose /workflow has not come yet.
+const ORDER = ["triage", "todo", "scheduled", "ready", "running", "blocked", "review", "done"];
+const FILTERS = { state: "open", agent: "all", prio: "all", group: "status" };
+
+const remembered = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key) ?? "null") ?? fallback; } catch { return fallback; } };
+const keep = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage full: memory only */ } };
 
 function find(node, id) {
   if (node?.id === id) return node;
   for (const child of node?.children ?? []) { const f = find(child, id); if (f) return f; }
   return null;
+}
+
+// As one of the side panels, only the shown one works. The panel's block is found by its mod, whatever its id.
+// Adapted from ghchecker (MIT), mods/ghchecker/main.js hidden(), itself from jankeesvw/herdr-issues (MIT).
+function hidden() {
+  const root = layout(), body = find(root, "panel-body"), mine = body?.children?.find((c) => c.content?.mod === MOD && !c.content?.props?.button);
+  if (!mine) return false;
+  if (body.type !== "stack") return Boolean(find(root, "panel")?.hidden || mine.hidden);
+  return Boolean(find(root, "panel")?.hidden || body.active !== mine.id);
 }
 
 export default class HermesKanban extends View {
@@ -37,7 +60,90 @@ export default class HermesKanban extends View {
       this.refreshAt = shared("hermes-kanban.refresh")?.at;
       this.beat(cx);
       cx.timer.every(WATCH, (cx) => this.beat(cx));
+      return;
     }
+    if (p.menu) { this.menu = { ...p.menu, overlay: p.overlay }; return; }
+    // The task overlay, the new task and the settings dialog come in their own step; until then a plain note.
+    if (p.task || p.create || p.settings) { this.later = true; return; }
+    this.panel(cx);
+  }
+
+  // ---- the panel ----
+  panel(cx) {
+    this.settings = defaults(); // hermes-kanban.json, read at start and after Save in the settings
+    this.f = { ...FILTERS, ...remembered("filters", {}) };
+    this.filtering = remembered("filtering", false);
+    this.query = "";
+    this.input = InputState.new({ placeholder: "Search" });
+    this.input.on("change", (_e, cx) => { this.query = this.input.value(); cx.notify(); });
+    this.last = null;          // the focus of the last look (focusedInstance keeps it while this panel has the keyboard)
+    this.pickedAt = shared("hermes-kanban.pick")?.at;
+    this.configAt = shared("hermes-kanban.config")?.at;
+    if (checking()) return; // herdr-app check runs init: no timer, no reads there
+    this.readSettings(cx);
+    readTextFile(`${appHome()}/mods/hermes-kanban/mod.json`).then((text) => { this.version = localVersion(text); cx.notify(); }, () => null);
+    cx.timer.every(TICK, (cx) => this.tick(cx));
+    // keys.json: "alt-h r": "hermes-kanban:refresh", or filter (show or hide the filter bar), settings, new (a new task
+    // on the shown instance), open (the first row).
+    cx.spawn(async (cx) => {
+      for (;;) {
+        const c = await nextCommand();
+        const m = this.shownMachine();
+        if (c === "refresh") this.refresh(m);
+        else if (c === "filter") this.setFiltering(!this.filtering);
+        else if (c === "settings") this.openSettings(m);
+        else if (c === "new" && m) this.openCreate(m);
+        else if (c === "open") this.openFirst();
+        cx.notify();
+      }
+    });
+  }
+
+  readSettings(cx) {
+    cx.spawn(async (cx) => { this.settings = (await loadSettings(readTextFile, appHome)).values; cx.notify(); });
+  }
+
+  // The focus now: the Hermes pane and its machine, or none. A click into this panel keeps the last one.
+  focusNow() {
+    return focusedInstance({ spaces: spaces(), panes: panes(), focused: focused() }, this.last);
+  }
+  tick(cx) {
+    // Nothing to do while the panel is hidden or the window can't be seen (minimized, covered, another Space).
+    if (hidden() || hostWindow()?.visible === false) { this.away = true; return; }
+    const key = JSON.stringify(this.focusNow());
+    // The focus moved, the panel came back, or the ages in the rows ("14m") move on.
+    if (key !== this.focusKey || this.away || Date.now() - (this.drawnAt ?? 0) > 30000) { this.away = false; cx.notify(); }
+  }
+  // The machine whose board the panel shows (for the header buttons and the key commands), or null.
+  shownMachine() { return this.last?.hermes ? this.last.machine : null; }
+
+  setFiltering(on) { this.filtering = on; keep("filtering", on); }
+  setFilter(patch) { this.f = { ...this.f, ...patch }; keep("filters", this.f); }
+  // A refresh polls that machine now: the watcher (in the button) reads shared "hermes-kanban.refresh".
+  refresh(machine) {
+    if (!machine) return;
+    this.refreshing = { machine, at: Date.now() };
+    setShared("hermes-kanban.refresh", this.refreshing);
+  }
+
+  // ---- opening ----
+  openTask(task) {
+    openOverlay({ mod: MOD, kind: "dialog", width: 0.86, height: 0.88, props: { task: { machine: task.machine, id: task.id } } });
+  }
+  openCreate(machine) {
+    openOverlay({ mod: MOD, kind: "dialog", modal: true, frame: "none", width: 560, height: 0.9, props: { create: { machine } } });
+  }
+  // The settings edit the instance the panel shows (null: none, only the settings of all instances).
+  openSettings(machine) {
+    openOverlay({ mod: MOD, kind: "dialog", modal: true, frame: "none", width: 620, height: 0.9, props: { settings: true, machine } });
+  }
+  openFirst() {
+    const first = this.entries?.find((x) => x.open);
+    if (first) first.open();
+  }
+  // A popup menu under the pointer; the pick comes back through shared "hermes-kanban.pick".
+  openMenu(kind, items, value) {
+    openOverlay({ mod: MOD, kind: "popup", width: 220, height: 12 + Math.min(items.length, 10) * 30, props: { menu: { kind, items, value } } });
   }
 
   // ---- the watcher and the update check, in the copy that holds the lease ----
@@ -112,6 +218,209 @@ export default class HermesKanban extends View {
     return box;
   }
 
+  // ---- drawing: the panel ----
+  shell(t) {
+    return v_flex().id(MOD).size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(13);
+  }
+
+  // The top, as ghchecker's: icon and "Hermes", the instance dim on the right, then +, refresh, filter and settings.
+  // The refresh icon turns until the next poll of the machine and turns red when the last one failed.
+  header(t, c, machine, snap) {
+    const gear = gearState(shared("hermes-kanban.update"), this.version), r = this.refreshing;
+    const busy = Boolean(machine && r?.machine === machine && (snap?.at ?? 0) < r.at && Date.now() - r.at < 30000);
+    const failed = Boolean(snap?.error) && !busy;
+    return h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
+      .child(h_flex().flex_none().gap(7).items_center().font_semibold().child(glyph("kanban", 14, t.foreground)).child("Hermes"))
+      .child(h_flex().flex_1().min_w(0).justify_end().text_size(12).text_color(t.dim).child(div().min_w(0).truncate().child(machine ?? "")))
+      .when(Boolean(machine), (x) => x
+        .child(this.headButton("new", "plus", false, "New task", () => this.openCreate(machine), t, c))
+        .child(this.headButton("refresh", "refresh", false, busy ? "Refreshing…" : failed ? `Sync failed: ${snap.error}. Click to try again.` : "Refresh",
+          (cx) => { this.refresh(machine); cx.notify(); }, t, c, { spin: busy, alarm: failed }))
+        .child(this.headButton("filter", "filter", this.filtering, this.filtering ? "Hide filters" : "Filters",
+          (cx) => { this.setFiltering(!this.filtering); cx.notify(); }, t, c)))
+      // Settings, also without a Hermes; gold with a slow shine while a newer release is out.
+      .child(this.headButton("settings", "settings", false, gear.tip, () => this.openSettings(machine), t, c, { gold: gear.update }));
+  }
+
+  // A header button as ghchecker's: a 14 px icon in a 24 px hit area; on: the selected background. `alarm`: the icon
+  // and a dot in red; `gold`: an update is out (icon, dot, shine).
+  headButton(id, name, on, tip, onClick, t, c, { spin = false, alarm = false, gold = false } = {}) {
+    const icon = glyph(name, 14, alarm ? c.red : gold ? GOLD : on ? t.foreground : t.muted);
+    return div().id(id).relative().w(24).h(24).flex_none().flex().items_center().justify_center().rounded(6)
+      .when(on, (e) => e.bg(t.selected)).when(gold, (e) => e.bg(alpha(GOLD, "1a"))).tooltip(tip)
+      .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+      .cursor_pointer().hover((s) => s.bg(gold ? alpha(GOLD, "33") : on ? t.selected : t.hover)).on_click((_e, cx) => onClick(cx))
+      // The shine: a gold layer that breathes every 2.4 s, natively (no render runs for it).
+      .when(gold, (e) => e.child(div().absolute().top(0).left(0).size(24).rounded(6).bg(alpha(GOLD, "38")).loop("opacity", { from: 0.15, to: 1, period: 2400 })))
+      .child(spin ? icon.spin(900) : icon)
+      .when(alarm || gold, (e) => e.child(div().absolute().top(2).right(2).size(6).rounded(3).bg(gold ? GOLD : c.red)));
+  }
+
+  // One red strip per other visible instance with tasks that need you. "Go to pane" reads spaces and panes at the
+  // click, so it lands where that machine's Hermes is now; the panel then follows by itself.
+  strips(t, c, shown) {
+    const boards = shared("hermes-kanban.boards") ?? {};
+    return visibleMachines(spaces()).filter((m) => m !== shown).map((m) => {
+      const n = (boards[m]?.board?.tasks ?? []).filter((x) => NEEDS_YOU.includes(x.status)).length;
+      if (!n) return null;
+      return h_flex().id(`needs-${m}`).h(32).flex_none().px(12).gap(8).items_center().border_b(1).border_color(t.border)
+        .bg(alpha(c.red, "14")).text_size(12).cursor_pointer().hover((s) => s.bg(alpha(c.red, "26")))
+        .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+        .on_click(() => {
+          const target = jumpTarget(m, { spaces: spaces(), panes: panes() }, shared("hermes-kanban.lastPanes"));
+          if (target) run("pane.focus", target);
+        })
+        .child(div().size(7).flex_none().rounded(4).bg(c.red).loop("opacity", { from: 0.35, to: 1, period: 1600 }))
+        .child(div().flex_1().min_w(0).truncate().child(`${m} needs you · ${n} blocked`))
+        .child(div().flex_none().text_color(t.muted).child("Go to pane →"));
+    }).filter(Boolean);
+  }
+
+  dropButton(id, label, t, onClick) {
+    return h_flex().id(id).h(22).px(8).gap(4).flex_none().items_center().rounded(6).text_size(12).text_color(t.foreground)
+      .cursor_pointer().hover((s) => s.bg(t.hover))
+      .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+      .on_click(onClick)
+      .child(div().truncate().child(label)).child(glyph("chevron-down", 12, t.muted));
+  }
+
+  // The filter bar, shown with the filter button: state, search, agent (not in single agent mode), priority, grouping.
+  // Agents come as a menu: an instance can have any number of profiles.
+  filterBar(t, agents, agent, single) {
+    const label = (text) => div().flex_none().mr(6).text_size(11).text_color(t.muted).child(text);
+    const pick = (patch) => (_k, cx) => { this.setFilter(patch(_k)); cx.notify(); };
+    return v_flex().flex_none().px(8).pt(8).pb(6).gap(6).border_b(1).border_color(t.border)
+      .child(h_flex().gap(8).items_center()
+        .child(segmented("state", [["open", "Open"], ["done", "Done"], ["all", "All"]], this.f.state, t, pick((k) => ({ state: k }))))
+        .child(div().flex_1())
+        .child(h_flex().id("search").w(150).h(24).px(8).gap(6).flex_none().items_center().rounded(6).border_1().border_color(t.border).cursor_text()
+          .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+          .child(glyph("search", 12, t.muted))
+          .child(Input.new(this.input).flex_1().min_w(0).h_full().text_size(12).text_color(t.foreground))))
+      .when(!single, (e) => e.child(h_flex().gap(2).items_center()
+        .child(label("Agent"))
+        .child(this.dropButton("agent", agent === "all" ? "All" : agent, t,
+          () => this.openMenu("agent", [["all", "All"], ...agents.map((a) => [a, a]), ["none", "none"]], agent)))))
+      .child(h_flex().gap(2).items_center()
+        .child(label("Prio"))
+        .child(segmented("prio", [["all", "All"], ["p1", "P1"], ["p2", "P2"], ["p3+", "P3+"]], this.f.prio, t, pick((k) => ({ prio: k }))))
+        .child(div().flex_1())
+        .child(label("Group"))
+        .child(segmented("group", [["status", "Status"], ["agent", "Agent"], ["none", "None"]], this.f.group, t, pick((k) => ({ group: k })))));
+  }
+
+  // A status's icon and color: blocked and review the red alert ("needs you", red also in Mono), running turns, done
+  // checked, the others a dot. Mono draws everything else in the theme's muted color.
+  look(status, t, c, mono) {
+    if (NEEDS_YOU.includes(status)) return { icon: "alert", color: c.red };
+    const color = mono ? t.muted : ({ triage: c.orange, ready: c.blue, running: c.yellow, done: c.magenta }[status] ?? t.muted);
+    return { icon: status === "running" ? "running" : status === "done" ? "check-circle" : "circle-dot", color };
+  }
+
+  // ---- drawing: the list ----
+  // Rows have a fixed height so the list can be virtual. A virtual list's rows take no handlers; the list reports
+  // clicks by key. Each row carries its key (lib/board.js taskKey: machine and ID) as id: GPUI repaints a hover change
+  // only for an element with an identity (scripts/hoverids.mjs).
+  row(key, size, t) {
+    return h_flex().id(key).h(size).w_full().flex_none().px(8).gap(9).items_center().rounded(7).cursor_pointer().overflow_hidden().hover((s) => s.bg(t.hover));
+  }
+  taskRow(task, key, size, x) {
+    const { t, c, mono } = x, s = this.look(task.status, t, c, mono), hint = hintOf(task, x.defaultAssignee), prio = prioLabel(task.priority);
+    const age = ago(task.status === "done" ? task.completedAt ?? task.createdAt : task.createdAt, Date.now() / 1000);
+    const meta = [task.id, task.assignee ?? "—", age].filter(Boolean).join(" · ");
+    const tint = hint && (hint.tone === "red" ? c.red : mono ? t.muted : c[hint.tone] ?? t.muted);
+    return this.row(key, size, t).child(glyphOf(s.icon, 15, s.color))
+      .child(v_flex().flex_1().min_w(0).gap(3)
+        .child(div().truncate().font_medium().child(task.title))
+        .child(h_flex().gap(4).items_center().overflow_hidden().text_size(11).text_color(t.muted)
+          .child(div().flex_none().child(meta))
+          .when(Boolean(hint), (e) => e.child(div().flex_none().child("·")).child(div().min_w(0).truncate().text_color(tint).child(hint.text)))))
+      .child(h_flex().flex_none().gap(8).items_center().text_size(11).text_color(t.muted)
+        .when(task.comments > 0, (e) => e.child(h_flex().gap(3).items_center().child(glyph("comment", 12, t.muted)).child(String(task.comments))))
+        .when(Boolean(prio), (e) => e.child(chip(prio, t))));
+  }
+  // A group's heading: its status color (grouped by status), name and count, and the red alert when it needs you.
+  heading(g, size, x) {
+    const { t, c, mono } = x, status = this.f.group === "status";
+    return h_flex().h(size).w_full().flex_none().px(8).pt(8).gap(7).items_center().text_size(12)
+      .when(status, (e) => e.child(div().size(7).flex_none().rounded(4).bg(this.look(g.key, t, c, mono).color)))
+      .child(div().min_w(0).truncate().font_semibold().child(g.label))
+      .child(div().flex_none().text_color(t.muted).child(String(g.count)))
+      .child(div().flex_1())
+      .when(g.needsYou, (e) => e.child(glyph("alert", 12, c.red)));
+  }
+
+  // The rows as entries { key, size, draw, open }: what the virtual list places and what a click opens.
+  entriesOf(groups, x) {
+    const entry = (key, draw, open) => ({ key, size: ROW, draw: (sz) => draw(sz, key), open });
+    return groups.flatMap((g, i) => [
+      { key: `g:${i}:${g.key}`, size: HEADING, draw: (sz) => this.heading(g, sz, x), open: null },
+      ...g.tasks.map((task) => entry(taskKey(task), (sz, key) => this.taskRow(task, key, sz, x), () => this.openTask(task))),
+    ]);
+  }
+
+  list(t, c, snap, agent, machine) {
+    const tasks = filterTasks(snap.board.tasks, { state: this.f.state, query: this.query, agent, prio: this.f.prio });
+    const box = v_flex().flex_1().min_h(0).relative().px(6).py(4);
+    if (!tasks.length) {
+      this.entries = [];
+      const narrowed = this.query.trim() !== "" || agent !== "all" || this.f.prio !== "all";
+      const text = narrowed ? "No tasks match" : { open: "No open tasks", done: "No done tasks" }[this.f.state] ?? "No tasks";
+      return box.child(div().px(16).py(28).text_size(12).text_center().text_color(t.dim).child(text));
+    }
+    const groups = groupTasks(tasks, this.f.group, snap.workflow?.order ?? ORDER, snap.workflow?.labels ?? {});
+    const items = this.entries = this.entriesOf(groups, { t, c, mono: this.settings["status.color"] === "mono", defaultAssignee: snap.defaultAssignee });
+    const byKey = new Map(items.map((x) => [x.key, x]));
+    const id = `list-${machine}`;
+    return box
+      .child(v_virtual_list(id, items.length, items.map((x) => x.size), (n) => items[n].key,
+        (range) => items.slice(range.start, range.end).map((x) => x.draw(x.size)))
+        .size_full()
+        .on_item_click((key) => byKey.get(key)?.open?.()))
+      .child(Scrollbar.vertical(id).absolute().inset_0());
+  }
+
+  // One line: running tasks and problems (red above 0) on the left, or a warning when the last poll failed; the
+  // gateway's dot (green running, red stopped) and the Hermes version on the right. No sync time.
+  statusBar(t, c, snap) {
+    const running = (snap.board?.tasks ?? []).filter((x) => x.status === "running").length, n = snap.problems;
+    const gw = snap.status, up = gw?.running === true, version = gw?.version ? String(gw.version).replace(/^v/i, "") : null;
+    return h_flex().id("status-bar").h(30).flex_none().px(12).gap(12).items_center().border_t(1).border_color(t.border).bg(t.chrome ?? t.background)
+      .text_size(11.5).text_color(t.muted)
+      .child(snap.error
+        ? h_flex().id("sync-warning").min_w(0).gap(5).items_center().text_color(c.red).tooltip(snap.error)
+          .child(glyph("alert", 12, c.red)).child(div().min_w(0).truncate().child(`Sync failed: ${snap.error}`))
+        : h_flex().flex_none().gap(5).items_center().child(`${running} running`)
+          .when(typeof n === "number", (e) => e.child("·").child(div().text_color(n > 0 ? c.red : t.muted).when(n > 0, (x) => x.font_medium())
+            .child(`${n} ${n === 1 ? "problem" : "problems"}`))))
+      .child(div().flex_1())
+      .child(h_flex().id("gateway").flex_none().gap(5).items_center().tooltip(up ? "Gateway running" : `Gateway ${gw?.state ?? "stopped"}`)
+        .child(div().size(7).flex_none().rounded(4).bg(up ? c.green : c.red)).child(version ? `Gateway v${version}` : "Gateway"));
+  }
+
+  // ---- the agent menu (a popup of this mod) ----
+  renderMenu(t) {
+    const m = this.menu;
+    return v_flex().id("menu").size_full().p(6).gap(1).overflow_y_scroll().bg(t.popover).text_color(t.foreground).text_size(12)
+      .children(m.items.map(([value, label], i) => h_flex().id(`menu-${i}`).h(28).flex_none().px(8).gap(8).items_center().rounded(6).cursor_pointer()
+        .hover((s) => s.bg(t.hover))
+        .on_click(() => { setShared("hermes-kanban.pick", { kind: m.kind, value, at: Date.now() }); closeOverlay(m.overlay); })
+        .child(div().w(14).flex_none().child(value === m.value ? glyph("check", 13, t.foreground) : div()))
+        .child(div().flex_1().truncate().child(label))));
+  }
+
+  // Opening the panel on an instance clears its green: the watcher zeroes the count of a machine marked seen. Marked
+  // once per count, so the write (which re-renders every mod) does not repeat.
+  markSeen(machine) {
+    const unseen = shared("hermes-kanban.unseen") ?? {};
+    if (this.seenFor && !(unseen[this.seenFor.machine] > 0)) this.seenFor = null;
+    const n = unseen[machine] ?? 0;
+    if (n > 0 && !(this.seenFor?.machine === machine && this.seenFor.n === n)) {
+      this.seenFor = { machine, n };
+      setShared("hermes-kanban.seen", { machine, at: Date.now() });
+    }
+  }
+
   render(cx) {
     const t = theme();
     if (this.button) {
@@ -123,7 +432,60 @@ export default class HermesKanban extends View {
       }
       return this.toolbar(t);
     }
-    // The panel: its board, filters and list come in their own step.
-    return v_flex().id(MOD).size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(13);
+    if (this.menu) return this.renderMenu(t);
+    if (this.later) return this.shell(t).child(blankslate(t, { title: "Not available yet" }));
+
+    this.drawnAt = Date.now();
+    if (hidden()) { this.away = true; return this.shell(t); }
+    const c = tones(t);
+    const pick = shared("hermes-kanban.pick");
+    if (pick?.at && pick.at !== this.pickedAt) {
+      this.pickedAt = pick.at;
+      if (pick.kind === "agent" && typeof pick.value === "string") this.setFilter({ agent: pick.value });
+    }
+    const config = shared("hermes-kanban.config");
+    if (config?.at && config.at !== this.configAt) { this.configAt = config.at; this.readSettings(cx); }
+
+    // Follow me: the board of the Hermes in the focused pane, and nothing else. Only a click into this panel (a mod
+    // block has the keyboard) keeps the last one (lib/instances.js).
+    const view = { spaces: spaces(), panes: panes() };
+    const focus = this.last = focusedInstance({ ...view, focused: focused() }, this.last);
+    this.focusKey = JSON.stringify(focus);
+    if (!focus.hermes) {
+      this.entries = [];
+      return this.shell(t).child(this.header(t, c, null, null)).children(this.strips(t, c, null))
+        .child(blankslate(t, { icon: "kanban", title: "No Hermes in this pane", tone: t.muted,
+          body: ["The panel follows the focused pane. Focus a pane that runs Hermes to see its board.", "Hermes on machines with an open space is still watched."] }));
+    }
+    const before = shared("hermes-kanban.lastPanes") ?? {}, lastPanes = rememberPane(before, focus, view.panes);
+    if (lastPanes !== before) setShared("hermes-kanban.lastPanes", lastPanes);
+    if (hostWindow()?.visible !== false) this.markSeen(focus.machine);
+
+    const boards = shared("hermes-kanban.boards") ?? {};
+    const snap = boards?.[focus.machine];
+    const shell = this.shell(t).child(this.header(t, c, focus.machine, snap)).children(this.strips(t, c, focus.machine));
+    this.entries = [];
+    if (!snap) return shell.child(blankslate(t, { icon: "running", title: "Reading the board…" }));
+    const access = snap.access?.state ?? "unknown";
+    if (snap.unsupported) {
+      return shell.child(blankslate(t, { icon: "alert", title: snap.unsupported, body: "Its board answers in a shape this version of Hermes Kanban does not know." }))
+        .child(this.statusBar(t, c, snap));
+    }
+    // Access to set up or fix (Task 12 draws the steps). A gateway that went down keeps its last board.
+    if (access !== "ok" && access !== "unknown" && !(access === "gateway_down" && snap.board)) {
+      return shell.child(blankslate(t, { icon: "alert", title: "No access to this board", body: `Access: ${access}` }));
+    }
+    if (!snap.board) {
+      return shell.child(blankslate(t, snap.error ? { icon: "alert", title: "Can't read the board", body: snap.error }
+        : snap.hermes ? { icon: "running", title: "Reading the board…" }
+          : { icon: "kanban", title: "No board on this machine", body: `Hermes keeps no Kanban board on ${focus.machine} yet.` }));
+    }
+    // Single agent mode hides the agent filter and lifts it; an agent this board does not have filters nothing.
+    const single = isSingleAgent(this.settings, focus.machine), agents = snap.board.assignees;
+    const agent = single || !(this.f.agent === "none" || agents.includes(this.f.agent)) ? "all" : this.f.agent;
+    return shell
+      .when(this.filtering, (e) => e.child(this.filterBar(t, agents, agent, single)))
+      .child(this.list(t, c, snap, agent, focus.machine))
+      .child(this.statusBar(t, c, snap));
   }
 }

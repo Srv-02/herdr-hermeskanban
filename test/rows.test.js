@@ -47,8 +47,8 @@ test("the button and the watcher use the shared keys of the mod exactly", () => 
   const all = source("main.js") + source("watcher.js");
   const keys = new Set([...all.matchAll(/"(hermes-kanban\.[\w.]+)"/g)].map((m) => m[1]));
   for (const k of ["hermes-kanban.lease", "hermes-kanban.update", "hermes-kanban.boards", "hermes-kanban.unseen", "hermes-kanban.seen",
-    "hermes-kanban.refresh", "hermes-kanban.lastPanes", "hermes-kanban.config"]) assert.ok(keys.has(k), `${k} is used`);
-  for (const k of keys) assert.match(k, /^hermes-kanban\.(lease|update|boards|unseen|seen|refresh|lastPanes|config)$/, `unknown key ${k}`);
+    "hermes-kanban.refresh", "hermes-kanban.lastPanes", "hermes-kanban.config", "hermes-kanban.pick"]) assert.ok(keys.has(k), `${k} is used`);
+  for (const k of keys) assert.match(k, /^hermes-kanban\.(lease|update|boards|unseen|seen|refresh|lastPanes|config|pick)$/, `unknown key ${k}`);
   assert.match(source("main.js"), /mods\/hermes-kanban\/mod\.json/);
 });
 
@@ -87,4 +87,71 @@ test("the button is a 92px block's pill as ghchecker's", () => {
 // against boards from before (the other copy toasted those changes already).
 test("losing the lease drops the watcher's state", () => {
   assert.match(code("main.js"), /if \(!next\.mine\) \{\s*if \(this\.mine\) this\.watch = \{\};/);
+});
+
+// ---- the panel ----
+
+// GPUI repaints a hover change only for an element with an identity (ghchecker test/rows.test.js): each row of the
+// virtual list carries its task key (machine and ID) as element id.
+test("the list rows carry their task key as element id", () => {
+  const src = source("main.js");
+  assert.match(src, /row\(key, size, t\) \{\s*return h_flex\(\)\.id\(key\)/);
+  assert.match(src, /draw: \(sz\) => draw\(sz, key\)/);
+  assert.match(src, /entry\(taskKey\(task\),/);
+});
+
+// The panel never mixes two boards: the list takes only the focused machine's snapshot.
+test("the panel reads only the focused machine's board", () => {
+  const src = code("main.js");
+  assert.match(src, /const snap = boards\?\.\[focus\.machine\]/);
+  assert.match(src, /filterTasks\(snap\.board\.tasks,/);
+  assert.equal([...src.matchAll(/filterTasks\(/g)].length, 1, "one place filters tasks");
+  assert.doesNotMatch(src, /Object\.values\([^)]*\)\.flatMap\([^)]*tasks/, "no list of tasks over several boards");
+  assert.doesNotMatch(src, /\.\.\.\w+\.board\.tasks/, "no spreading of one board's tasks into another list");
+});
+
+// R14: the panel follows the focus on its own 3 s beat, never during herdr-app check.
+test("the panel's follow-me timer runs after a checking() guard", () => {
+  const src = code("main.js"), timer = src.indexOf("cx.timer.every(TICK,");
+  assert.ok(timer >= 0, "the panel starts its 3 s timer");
+  const guard = src.lastIndexOf("if (checking()) return", timer);
+  assert.ok(guard >= 0 && guard > src.indexOf("cx.timer.every(WATCH,"), "a guard of its own comes before the panel's timer");
+  assert.match(src, /const TICK = 3000;/);
+});
+
+// Overlays carry only machine and ID: the overlay fetches the task itself and acts on that machine only.
+test("the panel opens its overlays with the source machine", () => {
+  const src = source("main.js");
+  assert.match(src, /kind: "dialog", width: 0\.86, height: 0\.88, props: \{ task: \{ machine: task\.machine, id: task\.id \} \}/);
+  assert.match(src, /props: \{ create: \{ machine \} \}/);
+  assert.match(src, /props: \{ settings: true, machine \}/);
+});
+
+test("the panel answers its key commands", () => {
+  const src = source("main.js");
+  for (const c of ["refresh", "filter", "settings", "new", "open"]) assert.match(src, new RegExp(`c === "${c}"`), c);
+  assert.match(src, /await nextCommand\(\)/);
+});
+
+// "Go to pane" reads spaces and panes when clicked, not the view of the last render.
+test("the needs-you strip jumps with fresh spaces and panes", () => {
+  assert.match(source("main.js"), /jumpTarget\(m, \{ spaces: spaces\(\), panes: panes\(\) \}, shared\("hermes-kanban\.lastPanes"\)\)/);
+  assert.match(source("main.js"), /needs you · \$\{n\} blocked/);
+  assert.match(source("main.js"), /"Go to pane →"/);
+});
+
+test("the panel never falls back to the last board outside of Hermes", () => {
+  const src = source("main.js");
+  assert.match(src, /"No Hermes in this pane"/);
+  assert.match(src, /if \(!focus\.hermes\)/);
+});
+
+test("the header is ghchecker's", () => {
+  const src = source("main.js");
+  assert.match(src, /h_flex\(\)\.h\(42\)\.flex_none\(\)\.px\(14\)\.gap\(8\)\.items_center\(\)\.border_b\(1\)/);
+  const order = ["\"new\"", "\"refresh\"", "\"filter\"", "\"settings\""].map((id) => src.indexOf(`this.headButton(${id}`));
+  assert.ok(order.every((i) => i >= 0), "all four header buttons");
+  assert.deepEqual([...order].sort((a, b) => a - b), order, "in the order +, refresh, filter, settings");
+  assert.match(src, /gearState\(shared\("hermes-kanban\.update"\), this\.version\)/);
+  assert.match(src, /h_flex\(\)\.id\("status-bar"\)\.h\(30\)/);
 });
