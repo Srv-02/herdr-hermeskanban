@@ -7,9 +7,9 @@
 // meanwhile (R18). The runners below are also the settings' (settings.js, "Remove access").
 import { div } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { exec, setShared } from "herdr";
+import { exec, shared, setShared } from "herdr";
 import { glyphOf, button, buttonFace } from "./ui.js";
-import { ACCESS_TEXT, SETUP_STEPS, SETUP_SCRIPT, PROBE_SCRIPT, accessOffer, setupUnit, parseProbe, scriptSpec, scriptError, restartSpec } from "./lib/setup.js";
+import { ACCESS_TEXT, SETUP_STEPS, SETUP_SCRIPT, PROBE_SCRIPT, accessOffer, setupUnit, parseProbe, scriptSpec, scriptError, restartSpec, restartRunning, markRestart } from "./lib/setup.js";
 import { BASE, KANBAN, parseResponse, redactSecrets, requestSpec, withBoard } from "./lib/request.js";
 import { normalizeStatus } from "./lib/board.js";
 
@@ -34,24 +34,32 @@ export async function runScript(machine, name, script, unit) {
   return why && r.stderr?.trim() ? `${why} ${redactSecrets(tail(r.stderr))}` : why;
 }
 
-async function gatewayRunning(machine) {
+// /api/status of the machine, normalized, or null when it does not answer.
+async function gatewayStatus(machine) {
   try {
     const r = parseResponse(await exec(...spec(requestSpec(machine, { mode: "none", method: "GET", url: `${BASE}/api/status` }))));
-    return r.code === 200 && normalizeStatus(r.json).running;
-  } catch { return false; }
+    return r.code === 200 ? normalizeStatus(r.json) : null;
+  } catch { return null; }
 }
 
 // Runs a restart spec (built by the click that asked for it), then waits up to 90 s for the gateway to run again.
+// One restart per machine at a time, for the panel and the settings alike: the shared mark says one is in flight.
 export async function restartGateway(restart, sleep) {
   const machine = restart.opts.on;
-  let r;
-  try { r = await exec(...spec(restart)); } catch (e) { return { error: redactSecrets(`The restart failed: ${message(e)}`) }; }
-  if (r.code !== 0) return { error: redactSecrets(`The restart failed (exit ${r.code}): ${tail(r.stderr || r.stdout)}`) };
-  for (let i = 0; i < 45; i++) {
-    if (await gatewayRunning(machine)) return { ok: true };
-    await sleep(2000);
+  if (restartRunning(shared("hermes-kanban.restarting"), machine, Date.now())) return { error: `A restart of the gateway on ${machine} is already running.` };
+  setShared("hermes-kanban.restarting", markRestart(shared("hermes-kanban.restarting"), machine, Date.now(), true));
+  try {
+    let r;
+    try { r = await exec(...spec(restart)); } catch (e) { return { error: redactSecrets(`The restart failed: ${message(e)}`) }; }
+    if (r.code !== 0) return { error: redactSecrets(`The restart failed (exit ${r.code}): ${tail(r.stderr || r.stdout)}`) };
+    for (let i = 0; i < 45; i++) {
+      if ((await gatewayStatus(machine))?.running) return { ok: true };
+      await sleep(2000);
+    }
+    return { error: "The gateway did not come back within 90 s." };
+  } finally {
+    setShared("hermes-kanban.restarting", markRestart(shared("hermes-kanban.restarting"), machine, Date.now(), false));
   }
-  return { error: "The gateway did not come back within 90 s." };
 }
 
 // GET /stats with the key: 200 means access works. The web app may need a moment after the gateway runs.
@@ -74,7 +82,7 @@ const refresh = (machine) => setShared("hermes-kanban.refresh", { machine, at: D
 class Flow {
   constructor(machine) {
     this.machine = machine;
-    this.phase = "idle"; this.error = null; this.doneAt = 0;
+    this.phase = "idle"; this.error = null; this.doneAt = 0; this.restartAt = 0;
   }
   get busy() { return ["setting_up", "restarting", "verifying"].includes(this.phase); }
 }
@@ -90,11 +98,14 @@ export class Access {
 
   // Whether the panel shows this machine's flow instead of its board: while a flow runs (a restart takes the gateway
   // down, and the board would stay), and until the board is readable after it. A finished flow goes once access is ok.
-  // A finished flow also goes when a poll after it still finds no access: the board's own state tells from then on.
+  // A finished flow also goes when a poll after it still finds no access, and a flow waiting for its restart goes when
+  // a poll after the setup finds the machine in another state (access removed in the settings meanwhile, say): the
+  // board's own state tells from then on.
   showing(machine, snap) {
-    const f = this.flows.get(machine), state = snap?.access?.state;
+    const f = this.flows.get(machine), state = snap?.access?.state, at = snap?.at ?? 0;
     if (!f) return false;
-    if ((state === "ok" && !f.busy) || (f.phase === "done" && (snap?.at ?? 0) > f.doneAt)) { this.flows.delete(machine); return false; }
+    const stale = (f.phase === "done" && at > f.doneAt) || (f.phase === "restart" && at > f.restartAt && state !== "waiting_restart");
+    if ((state === "ok" && !f.busy) || stale) { this.flows.delete(machine); return false; }
     return f.phase !== "idle";
   }
 
@@ -105,9 +116,15 @@ export class Access {
       try {
         const u = setupUnit(await probeMachine(f.machine));
         if (u.error) throw new Error(u.error);
+        // Asked again right before the write: an instance that no longer signs people in gets no setup.
+        const status = await gatewayStatus(f.machine);
+        if (!status) throw new Error(`The gateway on ${f.machine} does not answer; nothing was changed.`);
+        if (accessOffer({ state: "needs_setup", mode: status.gated ? "gated" : "open" }) !== "setup") {
+          throw new Error(`Hermes on ${f.machine} no longer signs people in, so it needs no setup; nothing was changed.`);
+        }
         const why = await runScript(f.machine, "setup", SETUP_SCRIPT, u.unit);
         if (why) throw new Error(why);
-        f.phase = "restart";
+        f.phase = "restart"; f.restartAt = Date.now();
         refresh(f.machine);
       } catch (e) {
         f.phase = "idle"; f.error = redactSecrets(message(e));
@@ -125,13 +142,13 @@ export class Access {
       const sleep = (ms) => cx.sleep(ms);
       try {
         const r = await restartGateway(restart, sleep);
-        if (r.error) { f.phase = "restart"; f.error = r.error; return; }
+        if (r.error) { f.phase = "restart"; f.restartAt = Date.now(); f.error = r.error; return; }
         f.phase = "verifying"; cx.notify();
         const v = await verifyAccess(f.machine, sleep);
         if (v.ok) { f.phase = "done"; f.doneAt = Date.now(); }
         else { f.phase = "idle"; f.error = v.code === 401 ? ACCESS_TEXT.token_rejected.body : `The check with the key got ${v.code ? `HTTP ${v.code}` : "no answer"}.`; }
       } catch (e) {
-        f.phase = "restart"; f.error = redactSecrets(message(e));
+        f.phase = "restart"; f.restartAt = Date.now(); f.error = redactSecrets(message(e));
       } finally {
         refresh(f.machine);
         cx.notify();

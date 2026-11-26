@@ -6,7 +6,7 @@ import path from "node:path";
 import { mkTmpSync } from "./tmp-helper.js";
 import {
   DELETE_TOKEN_SCRIPT, DROPIN_NAME, DROPIN_TEXT, PROBE_SCRIPT, REMOVE_SCRIPT, SETUP_SCRIPT, UNIT_RE,
-  ACCESS_TEXT, SETUP_STEPS, accessOffer, accessState, curlOk, nextRemovalStep, parseProbe, pickUnit, restartSpec, scriptError,
+  ACCESS_TEXT, ENV_HIDDEN_TEXT, RESTART_MARK_MS, SETUP_STEPS, markRestart, restartRunning, accessOffer, accessState, curlOk, nextRemovalStep, parseProbe, pickUnit, restartSpec, scriptError,
   scriptSpec, setupUnit,
 } from "../mods/hermes-kanban/lib/setup.js";
 
@@ -158,7 +158,7 @@ test("probe reports the machine without printing the token", () => {
   assert.ok(!r.stdout.includes("tok-FAKE-456"));
   assert.deepEqual(parseProbe(r.stdout), {
     home: true, units: [UNIT, "hermes-gateway-b.service"], curl: "8.18.0", python3: true, token: true,
-    dropins: [UNIT], runningEnv: { [UNIT]: true, "hermes-gateway-b.service": true },
+    dropins: [UNIT], runningEnv: { [UNIT]: true, "hermes-gateway-b.service": true }, envHidden: [],
   });
 });
 
@@ -166,13 +166,13 @@ test("probe on a bare machine", () => {
   const m = fakeMachine({ units: "", python: false });
   fs.rmdirSync(path.join(m.home, ".hermes"));
   const p = parseProbe(m.run(PROBE_SCRIPT).stdout);
-  assert.deepEqual(p, { home: false, units: [], curl: "8.18.0", python3: false, token: false, dropins: [], runningEnv: {} });
+  assert.deepEqual(p, { home: false, units: [], curl: "8.18.0", python3: false, token: false, dropins: [], runningEnv: {}, envHidden: [] });
 });
 
 test("parseProbe reads every key", () => assert.deepEqual(parseProbe(
   "home=yes\nunit=hermes-gateway.service\ncurl=8.18.0\npython3=yes\ntoken=no\ndropin=hermes-gateway.service\nenv=hermes-gateway.service:no\n"),
   { home: true, units: ["hermes-gateway.service"], curl: "8.18.0", python3: true, token: false,
-    dropins: ["hermes-gateway.service"], runningEnv: { "hermes-gateway.service": false } }));
+    dropins: ["hermes-gateway.service"], runningEnv: { "hermes-gateway.service": false }, envHidden: [] }));
 
 test("curlOk", () => {
   assert.ok(curlOk("7.55.0")); assert.ok(curlOk("8.18.0")); assert.ok(!curlOk("7.54.1")); assert.ok(!curlOk(null));
@@ -301,4 +301,26 @@ test("scriptError explains the exit codes of the scripts", () => {
   assert.match(scriptError("delete_token", 3), /drop-in/);
   assert.match(scriptError("delete_token", 4), /restart/i);
   assert.match(scriptError("remove", 1), /exit 1/);
+});
+
+test("probe says when the running gateway's environment is unreadable", () => {
+  const m = fakeMachine({ pid: "99" }); // no environ file for 99
+  const p = parseProbe(m.run(PROBE_SCRIPT).stdout);
+  assert.deepEqual(p.envHidden, [UNIT]);
+  assert.equal(p.runningEnv[UNIT], true, "unreadable still counts as having the variable");
+  assert.equal(nextRemovalStep({ unit: UNIT, probe: { ...p, dropins: [] } }), "offer_restart");
+  assert.deepEqual(parseProbe("envhidden=x;y\n").envHidden, []);
+  assert.match(ENV_HIDDEN_TEXT, /cannot read the running gateway's environment/);
+});
+
+test("restart marks: per machine, and old ones count as gone", () => {
+  const now = 1_000_000;
+  let marks = markRestart(null, "devbox", now, true);
+  assert.ok(restartRunning(marks, "devbox", now + 1000));
+  assert.ok(!restartRunning(marks, "labbox", now + 1000));
+  assert.ok(!restartRunning(marks, "devbox", now + RESTART_MARK_MS));
+  marks = markRestart(marks, "labbox", now, true);
+  marks = markRestart(marks, "devbox", now, false);
+  assert.deepEqual(marks, { labbox: { at: now } });
+  assert.ok(!restartRunning(undefined, "devbox", now));
 });

@@ -13,7 +13,7 @@ import { theme, closeOverlay, appHome, readTextFile, writeTextFile, shared, setS
 import { glyph, glyphOf, openUrl, alpha, tones, GOLD } from "./ui.js";
 import { SETTINGS, CONFIG_FILE, parseSettings, saveSettings, changedSettings } from "./lib/settings.js";
 import { fetchRelease, localVersion, updateStatus, checkedAt, GITHUB_URL, COFFEE_URL, UPDATE_PROMPT } from "./lib/update.js";
-import { ACCESS_TEXT, REMOVE_SCRIPT, DELETE_TOKEN_SCRIPT, nextRemovalStep, pickUnit, restartSpec } from "./lib/setup.js";
+import { ACCESS_TEXT, ENV_HIDDEN_TEXT, REMOVE_SCRIPT, DELETE_TOKEN_SCRIPT, nextRemovalStep, pickUnit, restartSpec } from "./lib/setup.js";
 import { TOKEN_FILES, redactSecrets } from "./lib/request.js";
 import { probeMachine, runScript, restartGateway } from "./access.js";
 
@@ -147,11 +147,17 @@ export class SettingsDialog {
     if (r.phase === "working") return;
     r.phase = "working"; r.error = null; r.restarting = true; cx.notify();
     cx.spawn(async (cx) => {
-      const out = await restartGateway(restart, (ms) => cx.sleep(ms));
-      r.restarting = false;
-      if (out.error) r.error = out.error;
-      setShared("hermes-kanban.refresh", { machine: this.machine, at: Date.now() });
-      this.probe(cx, out.error ? null : "The gateway runs again.");
+      let note = null;
+      try {
+        const out = await restartGateway(restart, (ms) => cx.sleep(ms));
+        if (out.error) r.error = out.error; else note = "The gateway runs again.";
+      } catch (e) {
+        r.error = redactSecrets(message(e));
+      } finally {
+        r.restarting = false; r.phase = "idle";
+        setShared("hermes-kanban.refresh", { machine: this.machine, at: Date.now() });
+        this.probe(cx, note);
+      }
     });
   }
 
@@ -177,7 +183,9 @@ export class SettingsDialog {
         [button(t, "settings-access-remove", "Remove access", (cx) => { r.phase = "confirm"; r.note = null; cx.notify(); }, { color: c.red })], true);
     }
     if (r.step === "offer_restart") {
-      return row(t, "settings-access", title, about(`${ACCESS_TEXT.waiting_restart.body} After it, the key on ${m} can go.`), [
+      // The probe cannot read the gateway's environment: a restart will not move this on, and the row says why.
+      const hidden = r.probe?.envHidden?.includes(r.unit);
+      return row(t, "settings-access", title, about(hidden ? ENV_HIDDEN_TEXT : `${ACCESS_TEXT.waiting_restart.body} After it, the key on ${m} can go.`), [
         face(t, "settings-access-restart", "Restart gateway").on_click((_e, cx) => this.restart(restartSpec(this.machine), cx))], true);
     }
     if (r.step === "delete_token") {

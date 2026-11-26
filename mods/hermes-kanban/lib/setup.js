@@ -33,7 +33,15 @@ const HAS_ENV = `has_env() {
 }
 `;
 
-export const PROBE_SCRIPT = `${HAS_ENV}
+// The gateway runs, and its environ is not readable: has_env then says yes, and the probe says why (envhidden).
+const ENV_HIDDEN = `env_hidden() {
+  pid=$(systemctl --user show -p MainPID --value "$1" 2>/dev/null)
+  case "$pid" in ''|0|*[!0-9]*) return 1 ;; esac
+  [ ! -r "\${HK_PROC:-/proc}/$pid/environ" ]
+}
+`;
+
+export const PROBE_SCRIPT = `${HAS_ENV}${ENV_HIDDEN}
 if [ -d "$HOME/.hermes" ] && [ -r "$HOME/.hermes" ]; then echo home=yes; else echo home=no; fi
 units=
 for u in $(systemctl --user list-unit-files 'hermes-gateway*.service' --no-legend 2>/dev/null | awk '{ print $1 }'); do
@@ -46,12 +54,13 @@ if [ -s "$HOME/${TOKEN_FILES.gated}" ]; then echo token=yes; else echo token=no;
 for u in $units; do
   [ -e "$HOME/.config/systemd/user/$u.d/${DROPIN_NAME}" ] && echo "dropin=$u"
   if has_env "$u"; then echo "env=$u:yes"; else echo "env=$u:no"; fi
+  if env_hidden "$u"; then echo "envhidden=$u"; fi
 done
 exit 0
 `;
 
 export function parseProbe(stdout) {
-  const p = { home: false, units: [], curl: null, python3: false, token: false, dropins: [], runningEnv: {} };
+  const p = { home: false, units: [], curl: null, python3: false, token: false, dropins: [], runningEnv: {}, envHidden: [] };
   for (const line of String(stdout ?? "").split("\n")) {
     const eq = line.indexOf("=");
     if (eq < 0) continue;
@@ -63,6 +72,7 @@ export function parseProbe(stdout) {
     else if (key === "python3") p.python3 = value === "yes";
     else if (key === "token") p.token = value === "yes";
     else if (key === "dropin" && UNIT_RE.test(value)) p.dropins.push(value);
+    else if (key === "envhidden" && UNIT_RE.test(value)) p.envHidden.push(value);
     else if (key === "env") {
       const colon = value.lastIndexOf(":");
       const unit = value.slice(0, colon);
@@ -211,3 +221,20 @@ export function scriptError(name, code) {
   if (name === "delete_token" && code === 4) return "The key stays: the running gateway still reads it. Restart the gateway first.";
   return `The step failed (exit ${code}).`;
 }
+
+// The restart of a gateway in flight, shared by the panel and the settings (shared "hermes-kanban.restarting",
+// Record<machine, { at }>), so two clicks never run two restarts of one machine. A mark older than RESTART_MARK_MS
+// (the restart's timeout plus the wait for the gateway) counts as gone: a view that died mid-restart cannot block it.
+export const RESTART_MARK_MS = 12 * 60 * 1000;
+export function restartRunning(marks, machine, now) {
+  const at = marks?.[machine]?.at;
+  return typeof at === "number" && now - at < RESTART_MARK_MS;
+}
+export function markRestart(marks, machine, now, on) {
+  const out = { ...(marks && typeof marks === "object" ? marks : {}) };
+  if (on) out[machine] = { at: now }; else delete out[machine];
+  return out;
+}
+
+// Why "Remove access" stays at the restart: the probe cannot read the running gateway's environment.
+export const ENV_HIDDEN_TEXT = "Hermes Kanban cannot read the running gateway's environment (/proc/<pid>/environ), so it cannot tell whether the gateway still uses the key. The key stays; once the gateway runs without the drop-in, delete ~/.hermes/dashboard.token by hand.";
