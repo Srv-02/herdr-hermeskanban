@@ -235,6 +235,8 @@ export default class HermesKanban extends View {
     const gear = gearState(shared("hermes-kanban.update"), this.version), r = this.refreshing;
     const busy = Boolean(machine && r?.machine === machine && (snap?.at ?? 0) < r.at && Date.now() - r.at < 30000);
     const failed = Boolean(snap?.error) && !busy;
+    // As ghchecker's: a grey dot on the filter icon while the closed second row holds a value other than its default.
+    const hiddenSet = !this.filtering && (this.f.prio !== "all" || this.f.group !== "status");
     return h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
       .child(h_flex().flex_none().gap(7).items_center().font_semibold().child(glyph("kanban", 14, t.foreground)).child("Hermes"))
       .child(h_flex().flex_1().min_w(0).justify_end().text_size(12).text_color(t.dim).child(div().min_w(0).truncate().child(machine ?? "")))
@@ -243,14 +245,14 @@ export default class HermesKanban extends View {
         .child(this.headButton("refresh", "refresh", false, busy ? "Refreshing…" : failed ? `Sync failed: ${snap.error}. Click to try again.` : "Refresh",
           (cx) => { this.refresh(machine); cx.notify(); }, t, c, { spin: busy, alarm: failed }))
         .child(this.headButton("filter", "filter", this.filtering, this.filtering ? "Hide priority and grouping" : "Priority and grouping",
-          (cx) => { this.setFiltering(!this.filtering); cx.notify(); }, t, c)))
+          (cx) => { this.setFiltering(!this.filtering); cx.notify(); }, t, c, { marked: hiddenSet })))
       // Settings, also without a Hermes; gold with a slow shine while a newer release is out.
       .child(this.headButton("settings", "settings", false, gear.tip, () => this.openSettings(machine), t, c, { gold: gear.update }));
   }
 
-  // A header button as ghchecker's: a 14 px icon in a 24 px hit area; on: the selected background. `alarm`: the icon
-  // and a dot in red; `gold`: an update is out (icon, dot, shine).
-  headButton(id, name, on, tip, onClick, t, c, { spin = false, alarm = false, gold = false } = {}) {
+  // A header button as ghchecker's: a 14 px icon in a 24 px hit area; on: the selected background. `marked`: a grey
+  // dot (a hidden filter is set); `alarm`: the icon and a dot in red; `gold`: an update is out (icon, dot, shine).
+  headButton(id, name, on, tip, onClick, t, c, { spin = false, alarm = false, gold = false, marked = false } = {}) {
     const icon = glyph(name, 14, alarm ? c.red : gold ? GOLD : on ? t.foreground : t.muted);
     return div().id(id).relative().w(24).h(24).flex_none().flex().items_center().justify_center().rounded(6)
       .when(on, (e) => e.bg(t.selected)).when(gold, (e) => e.bg(alpha(GOLD, "1a"))).tooltip(tip)
@@ -259,7 +261,7 @@ export default class HermesKanban extends View {
       // The shine: a gold layer that breathes every 2.4 s, natively (no render runs for it).
       .when(gold, (e) => e.child(div().absolute().top(0).left(0).size(24).rounded(6).bg(alpha(GOLD, "38")).loop("opacity", { from: 0.15, to: 1, period: 2400 })))
       .child(spin ? icon.spin(900) : icon)
-      .when(alarm || gold, (e) => e.child(div().absolute().top(2).right(2).size(6).rounded(3).bg(gold ? GOLD : c.red)));
+      .when(marked || alarm || gold, (e) => e.child(div().absolute().top(2).right(2).size(6).rounded(3).bg(gold ? GOLD : alarm ? c.red : t.muted)));
   }
 
   // One red strip per other visible instance with a needs-you event not seen yet (a task that stays blocked does not

@@ -382,3 +382,12 @@ test("single agent mode shows no agent names", () => {
   assert.match(viewer, /activityOf\(this\.detail, \{ agents, instance: this\.machine \}\)/);
   assert.match(watcher, /toastOf\(c, \{ single: isSingleAgent\(w\.settings, c\.machine\) \}\)/);
 });
+
+// As ghchecker's: while the priority and grouping row is closed and one of them is not its default, the filter icon
+// carries the grey 6 px dot.
+test("the filter button marks hidden filters with ghchecker's dot", () => {
+  const src = source("main.js");
+  assert.match(src, /const hiddenSet = !this\.filtering && \(this\.f\.prio !== "all" \|\| this\.f\.group !== "status"\)/);
+  assert.match(src, /\{ marked: hiddenSet \}/);
+  assert.match(src, /\.when\(marked \|\| alarm \|\| gold, \(e\) => e\.child\(div\(\)\.absolute\(\)\.top\(2\)\.right\(2\)\.size\(6\)\.rounded\(3\)\.bg\(gold \? GOLD : alarm \? c\.red : t\.muted\)\)\)/);
+});
