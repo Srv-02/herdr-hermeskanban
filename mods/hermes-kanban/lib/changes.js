@@ -47,15 +47,14 @@ export function toastOf(change) {
   return { title: `${change.machine}: ${change.agent || "a task"} ${verb}`, body, level };
 }
 
-// Red (count of blocked and review tasks over all instances) before green (something unseen finished) before yellow
-// (something runs).
-export function dotOf(boards, unseen) {
-  const tasks = Object.values(boards).flatMap((b) => b.tasks);
-  const count = tasks.filter((t) => NEEDS_YOU.includes(t.status)).length;
-  if (count > 0) return { tone: "red", count };
-  if (Object.values(unseen).some((n) => n > 0)) return { tone: "green", count: 0 };
-  if (tasks.some((t) => t.status === "running")) return { tone: "yellow", count: 0 };
-  return { tone: null, count: 0 };
+// The dot over all visible instances, from what is new and not seen yet (countUnseen): red for a needs-you event
+// (blocked, review, a block loop, a failure), else green for a finished task, else none. No count, nothing for running
+// agents, nothing for a task that just stays blocked.
+export function dotOf(unseen) {
+  const all = Object.values(unseen ?? {});
+  if (all.some((u) => u?.needs > 0)) return { tone: "red" };
+  if (all.some((u) => u?.done > 0)) return { tone: "green" };
+  return { tone: null };
 }
 
 // What one watcher pass tells the person: the toasts their switches allow (failed follows "needs you") and at most one
@@ -69,20 +68,29 @@ export function alertsOf(changes, settings) {
   return { toasts, sound };
 }
 
-// Finished tasks not looked at yet, per machine: each done change adds one. Only visible machines keep a count, so a
-// machine whose last space closed loses its green too.
+// What happened per machine since its panel was last opened: needs-you events (needs_you and failed) and finished
+// tasks. Only visible machines keep counts, so a machine whose last space closed loses its dot too. The panel's mark
+// "seen" zeroes a machine (watcher.js).
+const count = (n) => (Number.isInteger(n) && n >= 0 ? n : null);
 export function countUnseen(unseen, changes, machines) {
   const out = {};
   for (const m of machines) {
-    const n = unseen?.[m];
-    if (Number.isInteger(n) && n >= 0) out[m] = n;
+    const u = unseen?.[m], needs = count(u?.needs), done = count(u?.done);
+    if (needs !== null && done !== null) out[m] = { needs, done };
   }
-  for (const c of changes) if (c.kind === "done" && machines.includes(c.machine)) out[c.machine] = (out[c.machine] ?? 0) + 1;
+  for (const c of changes) {
+    if (!machines.includes(c.machine)) continue;
+    const u = out[c.machine] ??= { needs: 0, done: 0 };
+    if (c.kind === "done") u.done += 1; else u.needs += 1;
+  }
   return out;
 }
 
-// The boards of the poller's snapshots (Record<machine, Snapshot>), for dotOf: a snapshot without a board drops out.
-export const boardsOf = (snapshots) => Object.fromEntries(Object.entries(snapshots ?? {}).filter(([, s]) => s?.board).map(([m, s]) => [m, s.board]));
+// An unseen needs-you event on that machine: its red strip in the panel of another instance.
+export const needsYou = (unseen, machine) => unseen?.[machine]?.needs > 0;
 
-// The Dock badge: the count of the red dot, else none.
-export const badgeOf = (dot) => dot.count > 0 ? String(dot.count) : null;
+// The Dock badge: the number of unseen needs-you events, else none.
+export function badgeOf(unseen) {
+  const n = Object.values(unseen ?? {}).reduce((sum, u) => sum + (u?.needs > 0 ? u.needs : 0), 0);
+  return n > 0 ? String(n) : null;
+}

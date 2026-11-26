@@ -1,9 +1,9 @@
 // The watcher: the glue of the poller (lib/poller.js) to herdr. One pass polls every visible instance that is due,
-// shares the snapshots, counts what finished unseen, posts the toasts and sounds of the changes and sets the Dock
+// shares the snapshots, counts what is new and unseen (needs you, finished), posts the toasts and sounds of the changes and sets the Dock
 // badge. The button role in main.js runs it from its timer, only in the copy that holds the lease, and never during
 // herdr-app check; this file registers no timer.
 //
-// Shared keys: hermes-kanban.boards (Record<machine, Snapshot>), hermes-kanban.unseen (Record<machine, number>),
+// Shared keys: hermes-kanban.boards (Record<machine, Snapshot>), hermes-kanban.unseen (Record<machine, { needs, done }>),
 // hermes-kanban.lastPanes (Record<machine, paneId>), written here; hermes-kanban.seen ({ machine, at }, the panel),
 // hermes-kanban.refresh ({ machine, at }, panel or overlay after an action), hermes-kanban.config ({ at }, after
 // Save in the settings), read here.
@@ -12,7 +12,7 @@ import { createApi } from "./lib/api.js";
 import { createPoller } from "./lib/poller.js";
 import { loadSettings } from "./lib/settings.js";
 import { visibleMachines, focusedInstance, jumpTarget, rememberPane } from "./lib/instances.js";
-import { toastOf, dotOf, alertsOf, countUnseen, boardsOf, badgeOf } from "./lib/changes.js";
+import { toastOf, alertsOf, countUnseen, badgeOf } from "./lib/changes.js";
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -50,12 +50,12 @@ async function once(w) {
   const machines = visibleMachines(view.spaces);
   const { snapshots, changes } = await w.poller.tick(machines);
 
-  // Opening the panel of an instance clears its green: the panel marks it seen, and that zeroes its count.
+  // Opening the panel of an instance clears its dot: the panel marks it seen, and that zeroes its counts.
   let unseen = shared("hermes-kanban.unseen") ?? {};
   const seen = shared("hermes-kanban.seen");
   if (seen?.at && seen.at !== w.seenAt) {
     w.seenAt = seen.at;
-    if (typeof seen.machine === "string") unseen = { ...unseen, [seen.machine]: 0 };
+    if (typeof seen.machine === "string") unseen = { ...unseen, [seen.machine]: { needs: 0, done: 0 } };
   }
   unseen = countUnseen(unseen, changes, machines);
   // Each write re-renders every mod: only what changed.
@@ -70,7 +70,7 @@ async function once(w) {
   if (sound) playSound(sound);
 
   // The badge is the app's, shared by every mod: cleared only when this copy set it.
-  const badge = w.settings.badge ? badgeOf(dotOf(boardsOf(snapshots), unseen)) : null;
+  const badge = w.settings.badge ? badgeOf(unseen) : null;
   if ((w.settings.badge || w.badge != null) && badge !== w.badge) {
     setBadge(badge);
     w.badge = badge;

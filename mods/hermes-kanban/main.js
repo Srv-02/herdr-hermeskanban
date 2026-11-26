@@ -14,12 +14,12 @@ import { CreateDialog } from "./create.js";
 import { SettingsDialog } from "./settings.js";
 import { Access } from "./access.js";
 import { tones, alpha, glyph, glyphOf, segmented, chip, blankslate, look, GOLD } from "./ui.js";
-import { dotOf, boardsOf } from "./lib/changes.js";
+import { dotOf, needsYou } from "./lib/changes.js";
 import { loadSettings, defaults, isSingleAgent } from "./lib/settings.js";
 import { createUpdateGate, updateCheck, fetchLatest, localVersion, gearState } from "./lib/update.js";
 import { leaseNext } from "./lib/lease.js";
 import { focusedInstance, visibleMachines, jumpTarget, rememberPane } from "./lib/instances.js";
-import { filterTasks, groupTasks, hintOf, prioLabel, NEEDS_YOU } from "./lib/view.js";
+import { filterTasks, groupTasks, hintOf, prioLabel } from "./lib/view.js";
 import { taskKey } from "./lib/board.js";
 import { ago } from "./lib/time.js";
 
@@ -208,21 +208,18 @@ export default class HermesKanban extends View {
         .child(this.mark(t, ink)).child("Hermes"));
   }
 
-  // The icon with the dot over all visible instances on its top right corner (the pill keeps ghchecker's size):
-  // red and glowing with the count of tasks that need you, green for something finished and not seen, yellow and
-  // pulsing while an agent works, none for nothing.
+  // The icon with the dot over all visible instances on its top right corner (the pill keeps ghchecker's size): only
+  // what is new since the panel of that instance was last opened (lib/changes.js dotOf). Red and glowing for a task
+  // that needs you, green for one that finished; no count, nothing for running agents or tasks that stay blocked.
   mark(t, ink) {
-    const dot = dotOf(boardsOf(shared("hermes-kanban.boards")), shared("hermes-kanban.unseen") ?? {}), c = tones(t);
+    const dot = dotOf(shared("hermes-kanban.unseen")), c = tones(t);
     const box = div().relative().size(14).flex_none().child(glyph("kanban", 14, ink));
     if (dot.tone === "red") {
-      const n = dot.count > 99 ? "99+" : String(dot.count);
       return box
-        .child(div().absolute().top(-7).right(-9).h(16).min_w(16).rounded(8).bg(alpha(c.red, "66")).loop("opacity", { from: 0.15, to: 1, period: 1600 }))
-        .child(h_flex().absolute().top(-5).right(-7).h(12).min_w(12).px(3).items_center().justify_center().rounded(6).bg(c.red)
-          .text_size(9).font_semibold().text_color(t.background).child(n));
+        .child(div().absolute().top(-5).right(-5).size(11).rounded(6).bg(alpha(c.red, "66")).loop("opacity", { from: 0.15, to: 1, period: 1600 }))
+        .child(div().absolute().top(-3).right(-3).size(7).rounded(4).bg(c.red));
     }
     if (dot.tone === "green") return box.child(div().absolute().top(-3).right(-3).size(7).rounded(4).bg(c.green));
-    if (dot.tone === "yellow") return box.child(div().absolute().top(-3).right(-3).size(7).rounded(4).bg(c.yellow).loop("opacity", { from: 0.35, to: 1, period: 1400 }));
     return box;
   }
 
@@ -264,14 +261,13 @@ export default class HermesKanban extends View {
       .when(alarm || gold, (e) => e.child(div().absolute().top(2).right(2).size(6).rounded(3).bg(gold ? GOLD : c.red)));
   }
 
-  // One red strip per other visible instance with tasks that need you. "Go to pane" reads spaces and panes at the
-  // click, so it lands where that machine's Hermes is now; the panel then follows by itself.
+  // One red strip per other visible instance with a needs-you event not seen yet (a task that stays blocked does not
+  // count). "Go to pane" reads spaces and panes at the click, so it lands where that machine's Hermes is now; the panel
+  // then follows by itself and opening it there clears the event.
   strips(t, c, shown) {
-    const boards = shared("hermes-kanban.boards") ?? {};
-    return visibleMachines(spaces()).filter((m) => m !== shown).map((m) => {
-      const n = (boards[m]?.board?.tasks ?? []).filter((x) => NEEDS_YOU.includes(x.status)).length;
-      if (!n) return null;
-      return h_flex().id(`needs-${m}`).h(32).flex_none().px(12).gap(8).items_center().border_b(1).border_color(t.border)
+    const unseen = shared("hermes-kanban.unseen");
+    return visibleMachines(spaces()).filter((m) => m !== shown && needsYou(unseen, m)).map((m) =>
+      h_flex().id(`needs-${m}`).h(32).flex_none().px(12).gap(8).items_center().border_b(1).border_color(t.border)
         .bg(alpha(c.red, "14")).text_size(12).cursor_pointer().hover((s) => s.bg(alpha(c.red, "26")))
         .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
         .on_click(() => {
@@ -279,9 +275,8 @@ export default class HermesKanban extends View {
           if (target) run("pane.focus", target);
         })
         .child(div().size(7).flex_none().rounded(4).bg(c.red).loop("opacity", { from: 0.35, to: 1, period: 1600 }))
-        .child(div().flex_1().min_w(0).truncate().child(`${m} needs you · ${n} blocked`))
-        .child(div().flex_none().text_color(t.muted).child("Go to pane →"));
-    }).filter(Boolean);
+        .child(div().flex_1().min_w(0).truncate().child(`${m} needs you`))
+        .child(div().flex_none().text_color(t.muted).child("Go to pane →")));
   }
 
   dropButton(id, label, t, onClick) {
@@ -409,14 +404,14 @@ export default class HermesKanban extends View {
         .child(div().flex_1().truncate().child(label))));
   }
 
-  // Opening the panel on an instance clears its green: the watcher zeroes the count of a machine marked seen. Marked
-  // once per count, so the write (which re-renders every mod) does not repeat.
+  // Opening the panel on an instance clears its dot: the watcher zeroes the counts of a machine marked seen. Marked
+  // once per state of the counts, so the write (which re-renders every mod) does not repeat.
   markSeen(machine) {
-    const unseen = shared("hermes-kanban.unseen") ?? {};
-    if (this.seenFor && !(unseen[this.seenFor.machine] > 0)) this.seenFor = null;
-    const n = unseen[machine] ?? 0;
-    if (n > 0 && !(this.seenFor?.machine === machine && this.seenFor.n === n)) {
-      this.seenFor = { machine, n };
+    const unseen = shared("hermes-kanban.unseen") ?? {}, key = (m) => `${unseen[m]?.needs ?? 0}/${unseen[m]?.done ?? 0}`;
+    if (this.seenFor && key(this.seenFor.machine) === "0/0") this.seenFor = null;
+    const k = key(machine);
+    if (k !== "0/0" && !(this.seenFor?.machine === machine && this.seenFor.k === k)) {
+      this.seenFor = { machine, k };
       setShared("hermes-kanban.seen", { machine, at: Date.now() });
     }
   }

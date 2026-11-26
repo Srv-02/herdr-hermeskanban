@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { STAMP_SCRIPT, parseStamp, diffBoards, toastOf, dotOf, alertsOf, countUnseen, boardsOf, badgeOf } from "../mods/hermes-kanban/lib/changes.js";
+import { STAMP_SCRIPT, parseStamp, diffBoards, toastOf, dotOf, alertsOf, countUnseen, needsYou, badgeOf } from "../mods/hermes-kanban/lib/changes.js";
 
 const t = (id, o = {}) => ({
   machine: "devbox", id, title: `title ${id}`, status: "todo", assignee: "writer", failure: null, failures: 0, warnings: [], ...o,
@@ -76,19 +76,14 @@ test("toastOf: levels, bodies and a missing agent", () => {
   assert.equal(toastOf({ machine: "devbox", agent: "writer", kind: "failed", title: "Draft notes", failure: null }).body, "Draft notes");
 });
 
-test("dotOf: red over green over yellow, count of blocked and review", () => {
-  const boards = {
-    devbox: board("devbox", [t("a", { status: "blocked" }), t("b", { status: "running" })]),
-    labbox: board("labbox", [t("a", { status: "review" }), t("c", { status: "done" })]),
-  };
-  assert.deepEqual(dotOf(boards, { devbox: 3 }), { tone: "red", count: 2 });
-  const calm = { devbox: board("devbox", [t("b", { status: "running" })]) };
-  assert.deepEqual(dotOf(calm, { devbox: 1 }), { tone: "green", count: 0 });
-  assert.deepEqual(dotOf(calm, { devbox: 0 }), { tone: "yellow", count: 0 });
-  assert.deepEqual(dotOf({ devbox: board("devbox", [t("d", { status: "done" })]) }, {}), { tone: null, count: 0 });
+// The dot tells only what is new and not seen: no count, no yellow, a task that stays blocked tells nothing.
+test("dotOf: red for unseen needs-you events over green for unseen done, nothing else", () => {
+  assert.deepEqual(dotOf({ devbox: { needs: 1, done: 2 }, labbox: { needs: 0, done: 0 } }), { tone: "red" });
+  assert.deepEqual(dotOf({ devbox: { needs: 0, done: 1 } }), { tone: "green" });
+  assert.deepEqual(dotOf({ devbox: { needs: 0, done: 0 } }), { tone: null });
+  assert.deepEqual(dotOf({}), { tone: null });
+  assert.deepEqual(dotOf(null), { tone: null });
 });
-
-test("dotOf: nothing -> no dot", () => assert.deepEqual(dotOf({}, {}), { tone: null, count: 0 }));
 
 test("diffBoards: a task new since the baseline reports its current state", () => {
   const prev = board("devbox", [t("t_old", { status: "todo" })]);
@@ -125,21 +120,23 @@ test("alertsOf: one sound per pass, blocked before done, each on its own switch"
   assert.equal(alertsOf([ch("done")], { ...on, "toast.done": false }).sound, "done");
 });
 
-test("countUnseen: done changes add up per machine, machines out of view drop out", () => {
-  const changes = [ch("done"), ch("done", { id: "t_2" }), ch("needs_you"), ch("done", { machine: "labbox" })];
-  assert.deepEqual(countUnseen({ devbox: 1, gone: 4 }, changes, ["devbox", "labbox"]), { devbox: 3, labbox: 1 });
-  assert.deepEqual(countUnseen({ devbox: 2 }, [], ["devbox"]), { devbox: 2 });
+test("countUnseen: needs-you and failed add to needs, done to done, per machine; machines out of view drop out", () => {
+  const changes = [ch("done"), ch("done", { id: "t_2" }), ch("needs_you"), ch("failed"), ch("done", { machine: "labbox" })];
+  assert.deepEqual(countUnseen({ devbox: { needs: 1, done: 1 }, gone: { needs: 4, done: 0 } }, changes, ["devbox", "labbox"]),
+    { devbox: { needs: 3, done: 3 }, labbox: { needs: 0, done: 1 } });
+  assert.deepEqual(countUnseen({ devbox: { needs: 0, done: 2 } }, [], ["devbox"]), { devbox: { needs: 0, done: 2 } });
   assert.deepEqual(countUnseen(null, [ch("done", { machine: "nobox" })], ["devbox"]), {});
-  assert.deepEqual(countUnseen({ devbox: "x" }, [], ["devbox"]), {}, "a broken count is dropped");
+  assert.deepEqual(countUnseen({ devbox: 3 }, [], ["devbox"]), {}, "an old or broken count is dropped");
 });
 
-test("boardsOf: the boards of the snapshots that have one", () => {
-  const b = board("devbox", [t("a")]);
-  assert.deepEqual(boardsOf({ devbox: { machine: "devbox", board: b }, labbox: { machine: "labbox", board: null } }), { devbox: b });
-  assert.deepEqual(boardsOf(null), {});
+test("needsYou: only an unseen needs-you event of that machine", () => {
+  assert.equal(needsYou({ devbox: { needs: 2, done: 0 } }, "devbox"), true);
+  assert.equal(needsYou({ devbox: { needs: 0, done: 3 } }, "devbox"), false);
+  assert.equal(needsYou({}, "devbox"), false);
 });
 
-test("badgeOf: the count of the red dot, else nothing", () => {
-  assert.equal(badgeOf({ tone: "red", count: 3 }), "3");
-  assert.equal(badgeOf({ tone: "green", count: 0 }), null);
+test("badgeOf: the number of unseen needs-you events, else nothing", () => {
+  assert.equal(badgeOf({ devbox: { needs: 2, done: 1 }, labbox: { needs: 1, done: 0 } }), "3");
+  assert.equal(badgeOf({ devbox: { needs: 0, done: 4 } }), null);
+  assert.equal(badgeOf({}), null);
 });

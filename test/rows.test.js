@@ -81,6 +81,8 @@ test("the button is a 92px block's pill as ghchecker's", () => {
   assert.match(src, /glyph\("kanban", 14,/);
   assert.match(src, /\.child\("Hermes"\)/);
   assert.match(src, /setShared\("workspace\.panels"/);
+  assert.match(src, /dotOf\(shared\("hermes-kanban\.unseen"\)\)/, "the dot reads only what is unseen");
+  assert.doesNotMatch(src, /dot\.count|c\.yellow\)\.loop/, "no count, no yellow dot");
 });
 
 // A copy that lost the lease keeps no boards: on taking it back, its first poll is a new baseline, not a diff
@@ -136,7 +138,9 @@ test("the panel answers its key commands", () => {
 // "Go to pane" reads spaces and panes when clicked, not the view of the last render.
 test("the needs-you strip jumps with fresh spaces and panes", () => {
   assert.match(source("main.js"), /jumpTarget\(m, \{ spaces: spaces\(\), panes: panes\(\) \}, shared\("hermes-kanban\.lastPanes"\)\)/);
-  assert.match(source("main.js"), /needs you · \$\{n\} blocked/);
+  assert.match(source("main.js"), /\$\{m\} needs you`/);
+  assert.match(source("main.js"), /needsYou\(unseen, m\)/, "only for an unseen needs-you event");
+  assert.doesNotMatch(source("main.js"), /\d+ blocked|n\} blocked/, "no count of old blocked tasks");
   assert.match(source("main.js"), /"Go to pane →"/);
 });
 
