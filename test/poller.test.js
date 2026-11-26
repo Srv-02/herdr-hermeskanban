@@ -77,7 +77,7 @@ test("the first poll fetches everything and sets only the baseline", async () =>
   assert.equal(snap.hermes, true);
   assert.equal(snap.error, null);
   assert.equal(snap.unsupported, null);
-  assert.deepEqual(snap.access, { state: "ok", removalPending: false });
+  assert.deepEqual(snap.access, { state: "ok" });
   assert.deepEqual(snap.status, { version: "0.23.4", running: true, state: "running", gated: true });
   assert.equal(snap.mode, "gated");
   assert.equal(snap.defaultAssignee, "writer");
@@ -202,7 +202,7 @@ test("a gateway that is down reports gateway_down and probes", async () => {
   const r = await s.poller.tick(["devbox"]);
   const snap = r.snapshots.devbox;
   assert.equal(snap.hermes, true);
-  assert.deepEqual(snap.access, { state: "gateway_down", removalPending: false });
+  assert.deepEqual(snap.access, { state: "gateway_down" });
   assert.equal(snap.status, null);
   assert.equal(snap.board, null);
   assert.ok(snap.error);
@@ -234,7 +234,7 @@ test("401 runs the probe and reports needs_setup", async () => {
   const s = setup({ devbox: { stamp: "1.0", status: gated(), board: { detail: "Unauthorized" }, boardCode: 401 } });
   const r = await s.poller.tick(["devbox"]);
   assert.equal(s.count("probe"), 1);
-  assert.deepEqual(r.snapshots.devbox.access, { state: "needs_setup", removalPending: false });
+  assert.deepEqual(r.snapshots.devbox.access, { state: "needs_setup" });
   assert.equal(r.snapshots.devbox.board, null);
   assert.equal(r.snapshots.devbox.hermes, true);
   assert.deepEqual(r.changes, []);
@@ -248,7 +248,7 @@ test("a key that works again clears needs_setup and sets the baseline", async ()
   s.machines.devbox.boardCode = 200;
   s.advance(30000);
   const r = await s.poller.tick(["devbox"]);
-  assert.deepEqual(r.snapshots.devbox.access, { state: "ok", removalPending: false });
+  assert.deepEqual(r.snapshots.devbox.access, { state: "ok" });
   assert.deepEqual(r.changes, []);
 });
 

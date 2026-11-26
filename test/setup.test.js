@@ -191,22 +191,22 @@ test("accessState covers each state", () => {
   const open = { auth_required: false };
   const probe = (over = {}) => ({ home: true, units: [UNIT], curl: "8.18.0", python3: true, token: true, dropins: [], runningEnv: { [UNIT]: false }, ...over });
   const s = (status, p, statsCode) => accessState({ status, probe: p, statsCode });
-  assert.deepEqual(s(null, null, 0), { state: "gateway_down", removalPending: false });
-  assert.deepEqual(s(gated, null, 200), { state: "ok", removalPending: false });
-  assert.deepEqual(s(gated, probe(), 200), { state: "ok", removalPending: false });
-  assert.deepEqual(s(gated, probe({ home: false }), 401), { state: "wrong_user", removalPending: false });
-  assert.deepEqual(s(gated, probe({ units: [] }), 401), { state: "wrong_user", removalPending: false });
-  assert.deepEqual(s(gated, probe({ curl: "7.50.0" }), 401), { state: "curl_old", removalPending: false });
-  assert.deepEqual(s(gated, probe({ token: false, python3: false }), 401), { state: "no_python", removalPending: false });
-  assert.deepEqual(s(gated, probe({ dropins: [UNIT] }), 401), { state: "waiting_restart", removalPending: false });
-  assert.deepEqual(s(gated, probe({ dropins: [UNIT], runningEnv: { [UNIT]: true } }), 401), { state: "token_rejected", removalPending: false });
-  assert.deepEqual(s(gated, probe(), 401), { state: "needs_setup", removalPending: false });
-  assert.deepEqual(s(gated, probe({ token: false }), 401), { state: "needs_setup", removalPending: false });
-  assert.deepEqual(s(gated, null, 401), { state: "needs_setup", removalPending: false });
-  assert.deepEqual(s(open, null, 401), { state: "open_rejected", removalPending: false });
-  assert.deepEqual(s(open, probe(), 401), { state: "open_rejected", removalPending: false });
-  assert.deepEqual(s(gated, probe({ runningEnv: { [UNIT]: true } }), 200), { state: "ok", removalPending: true });
-  assert.deepEqual(s(gated, probe({ runningEnv: { [UNIT]: true } }), 401), { state: "needs_setup", removalPending: true });
+  assert.deepEqual(s(null, null, 0), { state: "gateway_down" });
+  assert.deepEqual(s(gated, null, 200), { state: "ok" });
+  assert.deepEqual(s(gated, probe(), 200), { state: "ok" });
+  assert.deepEqual(s(gated, probe({ home: false }), 401), { state: "wrong_user" });
+  assert.deepEqual(s(gated, probe({ units: [] }), 401), { state: "wrong_user" });
+  assert.deepEqual(s(gated, probe({ curl: "7.50.0" }), 401), { state: "curl_old" });
+  assert.deepEqual(s(gated, probe({ token: false, python3: false }), 401), { state: "no_python" });
+  assert.deepEqual(s(gated, probe({ dropins: [UNIT] }), 401), { state: "waiting_restart" });
+  assert.deepEqual(s(gated, probe({ dropins: [UNIT], runningEnv: { [UNIT]: true } }), 401), { state: "token_rejected" });
+  assert.deepEqual(s(gated, probe(), 401), { state: "needs_setup" });
+  assert.deepEqual(s(gated, probe({ token: false }), 401), { state: "needs_setup" });
+  assert.deepEqual(s(gated, null, 401), { state: "needs_setup" });
+  assert.deepEqual(s(open, null, 401), { state: "open_rejected" });
+  assert.deepEqual(s(open, probe(), 401), { state: "open_rejected" });
+  assert.deepEqual(s(gated, probe({ runningEnv: { [UNIT]: true } }), 200), { state: "ok" });
+  assert.deepEqual(s(gated, probe({ runningEnv: { [UNIT]: true } }), 401), { state: "needs_setup" });
 });
 
 test("scriptSpec and restartSpec bind to the machine", () => {

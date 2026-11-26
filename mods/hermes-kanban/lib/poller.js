@@ -22,7 +22,7 @@ const message = (e) => String(e?.message ?? e);
 function blank(machine) {
   return {
     machine, at: 0, board: null, status: null, workflow: null, defaultAssignee: "", resolvedAssignee: "", mode: null, problems: null,
-    access: { state: "unknown", removalPending: false }, error: null, unsupported: null, hermes: false,
+    access: { state: "unknown" }, error: null, unsupported: null, hermes: false,
   };
 }
 

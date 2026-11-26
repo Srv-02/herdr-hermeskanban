@@ -147,8 +147,7 @@ export function restartSpec(machine) {
 export function accessState({ status, probe, statsCode }) {
   const picked = probe ? pickUnit(probe.units) : {};
   const unit = picked.unit;
-  const removalPending = Boolean(unit && !probe.dropins.includes(unit) && probe.runningEnv[unit] === true);
-  const out = (state) => ({ state, removalPending });
+  const out = (state) => ({ state });
   if (!status) return out("gateway_down");
   if (statsCode === 200) return out("ok");
   if (probe && !probe.home) return out("wrong_user");
