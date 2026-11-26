@@ -293,7 +293,7 @@ export class SettingsDialog {
       .on_key_down((e, cx) => { if (e.key === "escape") { this.close(); cx.stop_propagation(); } })
       .w_full().max_h_full().overflow_hidden().rounded(10).border_1().border_color(t.border).shadow_xl().bg(t.popover).text_color(t.foreground)
       .child(h_flex().flex_none().items_center().px(30).pt(22).pb(8)
-        .child(div().flex_1().text_size(17).font_medium().child("Hermes settings"))
+        .child(div().flex_1().text_size(17).font_medium().child("Hermes Kanban Settings"))
         .child(div().id("settings-esc").px(7).py(3).rounded(6).border_1().border_color(t.border).text_size(11.5).text_color(t.muted)
           .cursor_pointer().hover((s) => s.bg(t.hover)).tooltip("Close").on_click(() => this.close()).child("Esc")))
       .child(v_flex().relative().flex_shrink(1).min_h(0)

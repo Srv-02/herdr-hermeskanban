@@ -317,9 +317,16 @@ test("main.js opens the settings dialog with its props", () => {
   assert.doesNotMatch(source("main.js"), /Not available yet/);
 });
 
+// The wait after a restart: 45 status checks 2 s apart, each about 0.25 s, measured live at about 100 s.
+test("the restart wait names the time it takes", () => {
+  const src = source("access.js");
+  assert.match(src, /for \(let i = 0; i < 45; i\+\+\)/);
+  assert.match(src, /"The gateway did not come back within 100 s\."/);
+});
+
 test("the settings dialog is ghchecker's", () => {
   const src = source("settings.js");
-  assert.match(src, /"Hermes settings"/);
+  assert.match(src, /"Hermes Kanban Settings"/);
   assert.match(src, /child\("Esc"\)/);
   assert.match(src, /\.bg\(t\.popover\)/);
   assert.match(src, /text_size\(17\)/);

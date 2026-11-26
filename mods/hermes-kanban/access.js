@@ -42,7 +42,7 @@ async function gatewayStatus(machine) {
   } catch { return null; }
 }
 
-// Runs a restart spec (built by the click that asked for it), then waits up to 90 s for the gateway to run again.
+// Runs a restart spec (built by the click that asked for it), then waits about 100 s (45 checks 2 s apart) for the gateway to run again.
 // One restart per machine at a time, for the panel and the settings alike: the shared mark says one is in flight.
 export async function restartGateway(restart, sleep) {
   const machine = restart.opts.on;
@@ -56,7 +56,7 @@ export async function restartGateway(restart, sleep) {
       if ((await gatewayStatus(machine))?.running) return { ok: true };
       await sleep(2000);
     }
-    return { error: "The gateway did not come back within 90 s." };
+    return { error: "The gateway did not come back within 100 s." };
   } finally {
     setShared("hermes-kanban.restarting", markRestart(shared("hermes-kanban.restarting"), machine, Date.now(), false));
   }
