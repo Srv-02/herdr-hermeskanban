@@ -188,10 +188,9 @@ export default class HermesKanban extends View {
 
   // ---- the tab bar button ----
   // Adapted from ghchecker (MIT), mods/ghchecker/main.js toolbar(), itself from jankeesvw/herdr-issues (MIT).
-  // A click jumps to another instance that needs you, else toggles the panel on a pane of a machine that runs Hermes,
-  // else only closes a
-  // shown panel (lib/instances.js buttonAction). The focus keeps the last one while a mod block (the panel) has the
-  // keyboard, as the panel's, so the button stays on while the panel is used.
+  // A click jumps to another instance with a dot (needs you before finished), else toggles the panel on a pane of a
+  // machine that runs Hermes, else only closes a shown panel (lib/instances.js buttonAction). The focus keeps the last
+  // one while a mod block (the panel) has the keyboard, as the panel's, so the button stays on while the panel is used.
   toolbar(t) {
     const root = layout(), panel = find(root, "panel"), body = find(root, "panel-body");
     const id = body?.children?.find((c) => c.content?.mod === MOD && !c.content?.props?.button)?.id ?? MOD;
@@ -226,19 +225,25 @@ export default class HermesKanban extends View {
         .hover((s) => s.bg(off ? t.chrome : t.hover))
         .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
         .on_click((_e, cx) => {
-          if (act.kind === "jump") {
+          let kind = act.kind;
+          if (kind === "jump") {
             const target = jumpTarget(act.machine, { spaces: spaces(), panes: panes() }, shared("hermes-kanban.lastPanes"));
-            if (!target) return;
-            run("pane.focus", target);
-            // The click clears that machine's dot at once; the panel there marks it seen.
+            // The click clears that machine's dot at once (red and green go together); the panel there marks it seen.
+            // Without a pane to land on, the dot goes all the same and the click does what it does without one.
             const cleared = clearUnseen(shared("hermes-kanban.unseen"), act.machine);
             if (cleared) setShared("hermes-kanban.unseen", cleared);
-            this.opening = { machine: act.machine, until: Date.now() + 1500 };
-            toggle(true);
-            // The restore may come without a render of this block: look again while the window lasts.
-            for (const ms of [300, 800, 1400]) cx.timer.after(ms, (cx) => cx.notify());
-          } else if (act.kind === "toggle") toggle(!on);
-          else if (act.kind === "close") toggle(false);
+            if (target) {
+              run("pane.focus", target);
+              this.opening = { machine: act.machine, until: Date.now() + 1500 };
+              toggle(true);
+              // The restore may come without a render of this block: look again while the window lasts.
+              for (const ms of [300, 800, 1400]) cx.timer.after(ms, (cx) => cx.notify());
+              return;
+            }
+            kind = act.otherwise;
+          }
+          if (kind === "toggle") toggle(!on);
+          else if (kind === "close") toggle(false);
         })
         .child(this.mark(t, ink)).child("Hermes"));
   }

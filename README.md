@@ -79,7 +79,7 @@ More in the guide: [Task overlay](docs/GUIDE.md#task-overlay).
 - On a pane of a machine that runs Hermes, it opens or closes the panel.
 - On any other pane, the button is grey. Its tooltip says `No Hermes on this machine`. Panes on your Mac count as such.
 - If the panel is open there, a click still closes it.
-- When another Hermes needs you, the tooltip says `Go to labbox`, for example. One click jumps to that machine and opens the panel there. This works from any pane.
+- When another Hermes has a dot, the tooltip says `Go to labbox`, for example. One click jumps to that machine and opens the panel there. A red dot comes before a green one. This works from any pane.
 - Inside the panel, a red strip `labbox needs you` with `Go to pane →` does the same.
 
 More in the guide: [Notifications](docs/GUIDE.md#notifications).
