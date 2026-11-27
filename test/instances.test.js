@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buttonAction, focusedInstance, hasHermes, isHermes, jumpTarget, rememberPane, visibleMachines } from "../mods/hermes-kanban/lib/instances.js";
+import { buttonAction, focusedInstance, hasHermes, isHermes, jumpTarget, rememberPane, visibleMachines, toastCommand, parseToastCommand } from "../mods/hermes-kanban/lib/instances.js";
 
 const spaces = [
   { id: "s1", machine: "devbox", tabs: [{ id: "t1" }, { id: "t2" }] },
@@ -219,4 +219,16 @@ test("buttonAction: a shell pane on a machine that runs Hermes toggles, and is t
 test("buttonAction: a click into the panel keeps the last Hermes focus, so the button toggles", () => {
   const focus = focusedInstance({ spaces, panes, focused: f({}) }, onDevbox);
   assert.deepEqual(buttonAction({ focus, machines, unseen: {}, on: true }), { kind: "toggle" });
+});
+
+test("toastCommand and parseToastCommand carry machine and ID through the mod command", () => {
+  const cmd = toastCommand("devbox", "t_a1b2");
+  assert.equal(cmd, "hermes-kanban.toast:devbox/t_a1b2");
+  // herdr hands nextCommand() the part after the first dot.
+  const sent = (c) => c.slice(c.indexOf(".") + 1);
+  assert.deepEqual(parseToastCommand(sent(cmd)), { machine: "devbox", id: "t_a1b2" });
+  assert.deepEqual(parseToastCommand(sent(toastCommand("lab/box:2", "t/x y"))), { machine: "lab/box:2", id: "t/x y" });
+  for (const c of ["refresh", "focus", "toast:", "toast:devbox", "toast:devbox/", "toast:a/b/c", "toast:%E0%A4%A/x", null, undefined, 7]) {
+    assert.equal(parseToastCommand(c), null, String(c));
+  }
 });

@@ -8,9 +8,9 @@
 // the machine now (shared "hermes-kanban.refresh").
 import { div } from "gpui-kit";
 import { v_flex, h_flex, TextView, TextareaState, Textarea } from "gpui-base";
-import { theme, closeOverlay, shared, setShared, exec, checking, readTextFile, appHome } from "herdr";
+import { theme, closeOverlay, shared, setShared, exec, notify, checking, readTextFile, appHome } from "herdr";
 import { tones, alpha, glyph, glyphOf, segmented, button, pill, look, openUrl } from "./ui.js";
-import { plainHtml, safeLink } from "./lib/text.js";
+import { plainHtml, safeLink, shownId } from "./lib/text.js";
 import { createApi } from "./lib/api.js";
 import { normalizeDetail } from "./lib/board.js";
 import { allowedMoves, outcomeText, commentAndUnblock, mergePatched, failureOf } from "./lib/moves.js";
@@ -184,7 +184,12 @@ export class TaskViewer {
     return v_flex().flex_none().gap(10).px(20).pt(18).pb(14).border_b(1).border_color(t.border)
       .child(h_flex().gap(10).items_center()
         .child(h_flex().flex_1().min_w(0).gap(8).flex_wrap().text_size(18).font_semibold()
-          .child(div().child(task?.title || `Loading ${this.id}…`)).child(div().font_normal().text_color(t.muted).child(this.id)))
+          .child(div().child(task?.title || `Loading ${shownId(this.id)}…`))
+          // The ID without Hermes' "t_": a click copies it.
+          .child(div().id("copy-id").px(4).rounded(4).font_normal().text_color(t.muted).cursor_pointer().tooltip("Copy ID")
+            .hover((s) => s.bg(t.hover))
+            .on_click((_e, cx) => { cx.write_to_clipboard(shownId(this.id)); notify({ title: "Copied", body: shownId(this.id), level: "success", timeout: 2500 }); })
+            .child(shownId(this.id))))
         .when(Boolean(this.busy) || this.loading, (e) => e.child(h_flex().flex_none().gap(6).items_center().text_size(12).text_color(t.muted)
           .child(glyphOf("running", 12, t.muted)).child(this.busy ?? "Reading")))
         .child(div().flex_none().text_size(12).text_color(t.dim).child(this.machine))

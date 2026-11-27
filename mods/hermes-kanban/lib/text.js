@@ -40,3 +40,7 @@ export function plainHtml(text) {
     ? `<a href="${escape(p.url)}">${escape(p.url)}</a>`
     : spaces(escape(p.text)))).join("")).join("<br>");
 }
+
+// A task's ID as people see and copy it: Hermes' database prefix "t_" off ("t_f070b12c" → "f070b12c"). Requests and
+// keys keep the full ID.
+export const shownId = (id) => (typeof id === "string" && id.startsWith("t_") && id.length > 2 ? id.slice(2) : String(id ?? ""));

@@ -68,7 +68,7 @@ More in the guide: [Task overlay](docs/GUIDE.md#task-overlay).
 ### Notifications
 
 - A toast tells you when a task needs you, fails or finishes.
-- Click the toast to jump to that machine. You land in the pane you used there last.
+- Click the toast to jump to that machine and open the task in its overlay. You land in the pane you used there last.
 - The `Hermes` button in the tab bar carries a dot for news you have not seen yet.
 - A red dot means something needs you. A green dot means a task is done.
 - Opening the panel for that Hermes clears its dot.

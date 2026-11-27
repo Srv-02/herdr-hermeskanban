@@ -2,7 +2,7 @@
 // line breaks kept, and only bare https URLs as links (opened on a click, https only). No Markdown, no raw HTML.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { plainHtml, linkify, safeLink } from "../mods/hermes-kanban/lib/text.js";
+import { plainHtml, linkify, safeLink, shownId } from "../mods/hermes-kanban/lib/text.js";
 
 // The only markup plainHtml may produce: line breaks and https links it made itself.
 const tags = (html) => [...html.matchAll(/<[^>]*>/g)].map((m) => m[0]);
@@ -78,4 +78,12 @@ test("plainHtml: 200k-char hostile inputs finish in under 200 ms each", () => {
 
 test("linkify: a bare https:// is text, not a link", () => {
   assert.deepEqual(linkify("https://."), [{ text: "https://" }, { text: "." }]);
+});
+
+test("shownId drops Hermes' t_ prefix only", () => {
+  assert.equal(shownId("t_f070b12c"), "f070b12c");
+  assert.equal(shownId("f070b12c"), "f070b12c");
+  assert.equal(shownId("t_"), "t_");
+  assert.equal(shownId("at_x"), "at_x");
+  assert.equal(shownId(null), "");
 });

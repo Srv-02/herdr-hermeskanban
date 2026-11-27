@@ -11,7 +11,7 @@ import { spaces, panes, focused, exec, notify, playSound, setBadge, shared, setS
 import { createApi } from "./lib/api.js";
 import { createPoller } from "./lib/poller.js";
 import { loadSettings, isSingleAgent } from "./lib/settings.js";
-import { visibleMachines, focusedInstance, jumpTarget, rememberPane } from "./lib/instances.js";
+import { visibleMachines, focusedInstance, rememberPane, toastCommand } from "./lib/instances.js";
 import { toastOf, alertsOf, nextUnseen, badgeOf, shownMachines } from "./lib/changes.js";
 import { readOsName } from "./lib/author.js";
 
@@ -71,8 +71,8 @@ async function once(w) {
 
   const { toasts, sound } = alertsOf(changes, w.settings);
   for (const c of toasts) {
-    const target = jumpTarget(c.machine, view, lastPanes);
-    notify({ ...toastOf(c, { single: isSingleAgent(w.settings, c.machine) }), timeout: 8000, ...(target ? { action: { name: "pane.focus", args: target } } : {}) });
+    // The click goes to the button (main.js listen): it jumps to the machine and opens the task in its overlay.
+    notify({ ...toastOf(c, { single: isSingleAgent(w.settings, c.machine) }), timeout: 8000, action: { name: toastCommand(c.machine, c.id) } });
   }
   if (sound) playSound(sound);
 
