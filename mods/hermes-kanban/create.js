@@ -9,6 +9,7 @@ import { createApi } from "./lib/api.js";
 import { outcomeText, failureOf } from "./lib/moves.js";
 import { loadSettings, isSingleAgent } from "./lib/settings.js";
 import { prioChoices } from "./lib/view.js";
+import { shownId } from "./lib/text.js";
 
 const CLEAR = "#00000000";
 const ok = (r) => r?.code >= 200 && r?.code < 300;
@@ -63,7 +64,7 @@ export class CreateDialog {
         else if (!r.task) this.error = "Hermes answered without a task.";
         else {
           setShared("hermes-kanban.refresh", { machine, at: Date.now() });
-          const text = `${r.task.id} · ${outcomeText(r.task.status, r.task, labels)}`;
+          const text = `${shownId(r.task.id)} · ${outcomeText(r.task.status, r.task, labels)}`;
           const warning = typeof r.json?.warning === "string" && r.json.warning.trim() ? r.json.warning.trim() : null;
           // A warning stays in the dialog until it is read; without one the dialog closes and a toast tells.
           if (warning) this.created = { text, warning };

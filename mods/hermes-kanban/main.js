@@ -18,9 +18,10 @@ import { dotOf, needsYou, shownNext, clearUnseen } from "./lib/changes.js";
 import { loadSettings, defaults, isSingleAgent } from "./lib/settings.js";
 import { createUpdateGate, updateCheck, fetchLatest, localVersion, gearState } from "./lib/update.js";
 import { leaseNext } from "./lib/lease.js";
-import { focusedInstance, visibleMachines, jumpTarget, rememberPane, buttonAction } from "./lib/instances.js";
+import { focusedInstance, visibleMachines, jumpTarget, rememberPane, buttonAction, parseToastCommand } from "./lib/instances.js";
 import { filterTasks, groupTasks, hintOf, prioLabel, agentsLabel, toggleAgent, pickedAgents, shownTime, sortOf } from "./lib/view.js";
 import { taskKey } from "./lib/board.js";
+import { shownId } from "./lib/text.js";
 import { ago } from "./lib/time.js";
 import { refreshState, staleFor } from "./lib/poller.js";
 
@@ -67,6 +68,7 @@ export default class HermesKanban extends View {
       this.refreshAt = shared("hermes-kanban.refresh")?.at;
       this.beat(cx);
       cx.timer.every(WATCH, (cx) => this.beat(cx));
+      this.listen(cx);
       return;
     }
     if (p.menu) { this.menu = { ...p.menu, overlay: p.overlay }; return; }
@@ -191,7 +193,8 @@ export default class HermesKanban extends View {
   // A click jumps to another instance with a dot (needs you before finished), else toggles the panel on a pane of a
   // machine that runs Hermes, else only closes a shown panel (lib/instances.js buttonAction). The focus keeps the last
   // one while a mod block (the panel) has the keyboard, as the panel's, so the button stays on while the panel is used.
-  toolbar(t) {
+  // The panel's place in the layout now: whether it shows, and a toggle that shows or hides it.
+  panelState() {
     const root = layout(), panel = find(root, "panel"), body = find(root, "panel-body");
     const id = body?.children?.find((c) => c.content?.mod === MOD && !c.content?.props?.button)?.id ?? MOD;
     // panel-body is a stack (one panel at a time) or a column (panels stacked, each toggled).
@@ -208,6 +211,41 @@ export default class HermesKanban extends View {
       for (const child of body.children) run(want.includes(child.id) ? "layout.show" : "layout.hide", { id: child.id });
       run("layout.show", { id: "panel" });
     };
+    return { on, toggle };
+  }
+  // Go to an instance: its last focused pane (lib/instances.js jumpTarget), then the panel there. The jump clears that
+  // machine's dot at once (red and green go together); the panel there marks it seen. Without a pane to land on, the
+  // dot goes all the same and the jump returns false.
+  jump(machine, cx) {
+    const target = jumpTarget(machine, { spaces: spaces(), panes: panes() }, shared("hermes-kanban.lastPanes"));
+    const cleared = clearUnseen(shared("hermes-kanban.unseen"), machine);
+    if (cleared) setShared("hermes-kanban.unseen", cleared);
+    if (!target) return false;
+    run("pane.focus", target);
+    this.opening = { machine, until: Date.now() + 1500 };
+    this.panelState().toggle(true);
+    // The restore may come without a render of this block: look again while the window lasts.
+    for (const ms of [300, 800, 1400]) cx.timer.after(ms, (cx) => cx.notify());
+    return true;
+  }
+  // A click on a toast (watcher.js) sends "toast:<machine>/<id>" (lib/instances.js toastCommand) to every shown copy;
+  // the lease holder answers it: the jump to that instance, then the task in its overlay. Without a pane there, the
+  // overlay opens all the same.
+  listen(cx) {
+    cx.spawn(async (cx) => {
+      for (;;) {
+        const c = await nextCommand();
+        const task = parseToastCommand(c);
+        if (!task || !this.mine) continue;
+        this.jump(task.machine, cx);
+        openOverlay({ mod: MOD, kind: "dialog", width: 0.88, height: 0.9, props: { task: { machine: task.machine, id: task.id } } });
+        cx.notify();
+      }
+    });
+  }
+
+  toolbar(t) {
+    const { on, toggle } = this.panelState();
     // After a jump the panel opens in the target space. The tab bar restores each space's panel once it sees the new
     // space, which can hide it again: until `opening.until` the panel is shown again whenever that space hides it.
     const space = spaces().find((s) => s.active);
@@ -227,19 +265,7 @@ export default class HermesKanban extends View {
         .on_click((_e, cx) => {
           let kind = act.kind;
           if (kind === "jump") {
-            const target = jumpTarget(act.machine, { spaces: spaces(), panes: panes() }, shared("hermes-kanban.lastPanes"));
-            // The click clears that machine's dot at once (red and green go together); the panel there marks it seen.
-            // Without a pane to land on, the dot goes all the same and the click does what it does without one.
-            const cleared = clearUnseen(shared("hermes-kanban.unseen"), act.machine);
-            if (cleared) setShared("hermes-kanban.unseen", cleared);
-            if (target) {
-              run("pane.focus", target);
-              this.opening = { machine: act.machine, until: Date.now() + 1500 };
-              toggle(true);
-              // The restore may come without a render of this block: look again while the window lasts.
-              for (const ms of [300, 800, 1400]) cx.timer.after(ms, (cx) => cx.notify());
-              return;
-            }
+            if (this.jump(act.machine, cx)) return;
             kind = act.otherwise;
           }
           if (kind === "toggle") toggle(!on);
@@ -378,7 +404,7 @@ export default class HermesKanban extends View {
   taskRow(task, key, size, x) {
     const { t, c, mono } = x, s = look(task.status, t, c, mono), hint = hintOf(task, x.defaultAssignee, { single: x.single }), prio = prioLabel(task.priority);
     const age = ago(shownTime(task), Date.now() / 1000);
-    const meta = [task.id, x.single ? null : task.assignee ?? "—", age].filter(Boolean).join(" · ");
+    const meta = [shownId(task.id), x.single ? null : task.assignee ?? "—", age].filter(Boolean).join(" · ");
     const tint = hint && (hint.tone === "red" ? c.red : mono ? t.muted : c[hint.tone] ?? t.muted);
     return this.row(key, size, t).child(glyphOf(s.icon, 15, s.color))
       .child(v_flex().flex_1().min_w(0).gap(3)

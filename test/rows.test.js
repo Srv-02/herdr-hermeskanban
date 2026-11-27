@@ -52,12 +52,20 @@ test("the button and the watcher use the shared keys of the mod exactly", () => 
   assert.match(source("main.js"), /mods\/hermes-kanban\/mod\.json/);
 });
 
-// A toast's click jumps like "Go to pane"; without a target it has no action (no pane.focus with args null).
-test("toasts carry a jump only with a target, and time out after 8 s", () => {
+// A toast's click sends its task to the button: the lease holder jumps like "Go to pane" and opens the task overlay.
+test("toasts carry their task as a mod command, and time out after 8 s", () => {
   const src = source("watcher.js");
   assert.match(src, /timeout: 8000/);
-  assert.match(src, /jumpTarget\(/);
-  assert.match(src, /target \? \{ action: \{ name: "pane\.focus", args: target \} \} : \{\}/);
+  assert.match(src, /action: \{ name: toastCommand\(c\.machine, c\.id\) \}/);
+  assert.doesNotMatch(code("watcher.js"), /pane\.focus/, "the toast no longer focuses a pane itself");
+  const main = code("main.js"), listen = main.indexOf("listen(cx) {");
+  assert.ok(main.indexOf("this.listen(cx);") > main.indexOf("if (checking()) return"), "the button listens only outside herdr-app check");
+  assert.ok(listen >= 0, "the button has a listen loop");
+  const body = main.slice(listen, main.indexOf("toolbar(t) {"));
+  assert.match(body, /parseToastCommand\(c\)/);
+  assert.match(body, /if \(!task \|\| !this\.mine\) continue;/, "only the lease holder answers");
+  assert.match(body, /this\.jump\(task\.machine, cx\)/);
+  assert.match(source("main.js"), /props: \{ task: \{ machine: task\.machine, id: task\.id \} \}/);
 });
 
 test("sounds are herdr's attention sounds, the badge only through its switch", () => {

@@ -113,7 +113,7 @@ At the bottom: `3 running · 1 problem` on the left, followed by `synced 4m ago`
 
 ### Rows
 
-- **Left:** the status icon, the title, and `t_a1b2 · writer · 14m` (ID, agent or `—`, age; for a done task the time since it finished).
+- **Left:** the status icon, the title, and `a1b2 · writer · 14m` (ID without Hermes' internal prefix `t_`, agent or `—`, age; for a done task the time since it finished).
 - **The hint** after it:
   - **blocked:** why, from the run that blocked it, else the last failure; `blocked` when Hermes says nothing.
   - **ready with an agent:** `starts with next dispatch`.
@@ -131,7 +131,7 @@ At the bottom: `3 running · 1 problem` on the left, followed by `synced 4m ago`
 
 A click on a row opens the task in a large dialog. Everything in it goes to the task's own machine.
 
-- **The head:** title, ID, the instance, Close (Esc); the status pill, the agent, `created 2h ago` and the number of comments.
+- **The head:** title, ID (without Hermes' internal prefix `t_`; click it to copy it), the instance, Close (Esc); the status pill, the agent, `created 2h ago` and the number of comments.
 - **Left:** for a blocked task a red box with the reason (`writer is blocked`, `needs input: …`); the description; the activity (events and comments, newest first, heartbeats left out); and the comment box.
 - **Text from Hermes** (titles, descriptions, comments, reasons) is drawn as plain text, never as Markdown or HTML: anyone who can reach an instance can write a task. Line breaks stay; a bare `https` URL becomes a link that opens in your browser on a click. No picture or other resource is ever loaded.
 - **Comment** (or Ctrl+Enter) adds the comment under your name: the full name of your Mac user, or the name set under [Comment author](#settings) in the settings (`herdr` only when neither is there). **Comment & unblock**, for a blocked task, adds the comment and then asks Hermes to move the task to Ready. These are two requests: when Hermes refuses the move (a parent task is not done, say), the comment stays and the line at the bottom says so.
@@ -157,7 +157,7 @@ The `+` in the header opens `New task` on the instance the panel shows; the dial
   - **needs you:** a task became Blocked or Review, or keeps cycling between blocked and unblocked: `devbox: writer needs input`.
   - **failed:** Hermes counts a new failed run of the task (crashed, timed out, gave up, could not start): `devbox: writer failed`, with the reason.
   - **done:** `devbox: writer finished`.
-  - A click on a toast jumps to that instance: the pane you focused there last (a shell pane as well, if it is still open), else the first pane that runs Hermes, else the first terminal pane, else any pane of a space on that machine; the panel follows by itself.
+  - A click on a toast jumps to that instance and opens the task in its overlay. You land in the pane you focused there last (a shell pane as well, if it is still open), else the first pane that runs Hermes, else the first terminal pane, else any pane of a space on that machine; the panel opens there. Without any pane on that machine, the overlay opens all the same. The click clears the instance's dot, as the button's jump does.
 - **The dot** on the `Hermes` button, over all visible instances: red and glowing for something new that needs you (needs you or failed), green for a task newly done, nothing else. It shows only what you have not seen: opening the panel on an instance clears its part at once, and so does a click on the button that jumps there; and the instance the panel shows collects nothing. A task that just stays blocked, or an agent that runs, adds nothing. No count.
 - **Other instances:** in the panel, a red strip `labbox needs you` with `Go to pane →` for each other visible instance with unseen news that needs you.
 - **The button jumps:** while another visible instance has unseen news, red or green, the tooltip says `Go to labbox` and a click on `Hermes` goes to that instance, as a toast does, and opens the panel there. An instance that needs you comes first, then one with a finished task; among equals the first by name. The jump clears that instance's whole dot; a green dot on a third instance stays, and the next click jumps there. This holds on any pane, on a machine with or without Hermes, so while another instance has a green dot, a click jumps instead of closing the panel. When no pane of that instance can be found, the click clears its dot and then opens or closes the panel as usual. The instance the panel shows never counts. The red strips in the panel stay for needs you only.

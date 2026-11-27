@@ -75,3 +75,15 @@ export function buttonAction({ focus, machines, unseen, on }) {
   if (machine) return { kind: "jump", machine, otherwise };
   return { kind: otherwise };
 }
+
+// A toast's click runs one command without arguments: "hermes-kanban.toast:<machine>/<id>" goes to the mod's
+// nextCommand() as "toast:<machine>/<id>" (herdr sends the part after the first dot as is). Both parts are
+// URI-encoded, so a slash or colon in them cannot split the command wrong.
+export const toastCommand = (machine, id) => `hermes-kanban.toast:${encodeURIComponent(machine)}/${encodeURIComponent(id)}`;
+
+// The task of such a command as { machine, id }, or null for any other command.
+export function parseToastCommand(c) {
+  const m = /^toast:([^/]+)\/([^/]+)$/.exec(typeof c === "string" ? c : "");
+  if (!m) return null;
+  try { return { machine: decodeURIComponent(m[1]), id: decodeURIComponent(m[2]) }; } catch { return null; }
+}
