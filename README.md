@@ -56,7 +56,7 @@ More in the guide: [The board](docs/GUIDE.md#the-board).
 - Click a task to open it in a large window.
 - You see its description, its history and its comments.
 - A blocked task shows why it is blocked, in a red box.
-- Write a comment, or comment and unblock the task in one step.
+- Write a comment, or comment and unblock the task in one step. Comments carry the full name of your Mac user, or a name you set in the settings.
 - Assign an agent, change the priority or move the task. You only see the moves that Hermes allows.
 - Archive a task. A second click confirms it. The mod never deletes a task.
 - The `+` button in the header creates a new task.
@@ -102,6 +102,7 @@ More in the guide: [Set up access](docs/GUIDE.md#set-up-access) and [Remove acce
 - The gear in the panel header opens the settings.
 - Choose status colors, toasts, sounds, the Dock dot and how often the panel checks for news.
 - Single agent mode hides agent names for a Hermes with only one agent.
+- Change the name your comments carry.
 - Once a day the panel checks GitHub for a new version. You can switch that off.
 
 More in the guide: [Settings](docs/GUIDE.md#settings) and [Single agent mode](docs/GUIDE.md#single-agent-mode).

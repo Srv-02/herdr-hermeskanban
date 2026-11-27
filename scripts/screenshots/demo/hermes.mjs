@@ -1,6 +1,7 @@
 // A fake Hermes for the screenshot instance: answers every command the mod runs on a machine (the curl requests to the
 // Kanban API, the stamp, the probe, the access scripts, the gateway restart) with made-up data for two machines,
-// devbox and labbox, so the README images never show a real board, machine, person or key.
+// devbox and labbox, and `id` on this computer (the comment author) with an invented name, so the README images never
+// show a real board, machine, person or key.
 // The demo hook (../demo-hook.mjs) points the instance's copy of the mod at this file: its exec runs
 //   node hermes.mjs '<{ cmd, args, on }>' '<{ scene, state }>'
 // locally and never reaches a machine. Times are relative to now, so "14m" stays 14 minutes old whenever the shots are
@@ -152,6 +153,8 @@ const PROBE = ["home=yes", "unit=hermes-gateway.service", "curl=8.5.0", "python3
 // The answer to one exec call, as { code, stdout, stderr }. `ctx`: { scene, state, now (ms) }.
 export function answer({ cmd, args = [], on = null }, { scene = "board", state = null, now = Date.now() } = {}) {
   const fail = (why) => ({ code: 1, stdout: "", stderr: `demo: ${why}` });
+  // The comment author the watcher reads on this computer: an invented name, so no real one reaches screenshots/.
+  if (cmd === "id" && on === null) return { code: 0, stdout: args[0] === "-F" ? "Jane Doe\n" : "jdoe\n", stderr: "" };
   if (!MACHINES.includes(on)) return fail(`no machine ${on}`);
   const turned = scene === "notifications" && Boolean(state) && fs.existsSync(path.join(state, "demo-turn"));
   const ctx = { scene, state, now: now / 1000, turned };

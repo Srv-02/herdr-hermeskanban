@@ -1,6 +1,6 @@
 // The Settings dialog (an overlay of this mod, props { settings: true, machine }), laid out like ghchecker's: Updates
-// on top (a gold box when a new release is out, the installed version and Check now), then Agents, Display,
-// Notifications and Connection, then the links, and Cancel / Save at the bottom. Save writes the changed keys to
+// on top (a gold box when a new release is out, the installed version and Check now), then Agents, Comment author,
+// Display, Notifications and Connection, then the links, and Cancel / Save at the bottom. Save writes the changed keys to
 // hermes-kanban.json; the panel and the watcher read it again (shared "hermes-kanban.config").
 // The dialog edits the instance the panel showed when it opened (props.machine), also when the focus moves on:
 // single agent mode for it, its default agent (read only, from /orchestration) and "Remove access" in its
@@ -8,7 +8,7 @@
 // Layout and controls adapted from ghchecker by Michael Mayer (MIT), mods/ghchecker/settings.js, itself from
 // filer-pro (MIT), mods/filer-pro/ui/settings.js.
 import { div } from "gpui-kit";
-import { v_flex, h_flex, Scrollbar } from "gpui-base";
+import { v_flex, h_flex, Scrollbar, InputState, Input } from "gpui-base";
 import { theme, closeOverlay, appHome, readTextFile, writeTextFile, shared, setShared, notify, checking } from "herdr";
 import { glyph, glyphOf, openUrl, alpha, tones, GOLD } from "./ui.js";
 import { SETTINGS, CONFIG_FILE, parseSettings, saveSettings, changedSettings } from "./lib/settings.js";
@@ -16,6 +16,7 @@ import { fetchRelease, localVersion, updateStatus, checkedAt, GITHUB_URL, COFFEE
 import { ACCESS_TEXT, ENV_HIDDEN_TEXT, REMOVE_SCRIPT, DELETE_TOKEN_SCRIPT, nextRemovalStep, pickUnit, restartSpec } from "./lib/setup.js";
 import { TOKEN_FILES, redactSecrets } from "./lib/request.js";
 import { probeMachine, runScript, restartGateway } from "./access.js";
+import { authorOf, cleanAuthor } from "./lib/author.js";
 
 const CLEAR = "#00000000";
 const message = (e) => String(e?.message ?? e);
@@ -59,11 +60,18 @@ export class SettingsDialog {
     this.removal = { phase: "idle", probe: null, unit: null, step: null, error: null, note: null };
     this.mode = shared("hermes-kanban.boards")?.[machine]?.mode ?? null;
     this.handle = cx.focus_handle();
+    // The comment author's field: only a name that is not empty goes to the draft; leaving the field empty (or too
+    // long) shows the last valid name again.
+    this.authorInput = InputState.new({ placeholder: "Your name" });
+    this.authorInput.on("change", () => { const name = cleanAuthor(this.authorInput.value()); if (name && this.draft) this.draft["author.name"] = name; });
+    this.authorInput.on("blur", () => { if (this.draft && this.authorInput.value() !== this.draft["author.name"]) this.authorInput.set_value(this.draft["author.name"] ?? this.osName()); });
     if (checking()) return;
     cx.spawn(async (cx) => {
       const [text, mod] = await Promise.all([readTextFile(`${appHome()}/${CONFIG_FILE}`).catch(() => null), readTextFile(`${appHome()}/mods/hermes-kanban/mod.json`).catch(() => null)]);
       const { values, problems } = parseSettings(text);
       this.saved = values; this.draft = { ...values, single_agent: [...values.single_agent] }; this.version = localVersion(mod);
+      // A switched-on name without a stored one (a hand-edited file) starts from the OS name.
+      if (values["author.custom"]) { this.draft["author.name"] = authorOf(values, this.osName()); this.authorInput.set_value(this.draft["author.name"]); }
       if (problems.includes(CONFIG_FILE)) { this.broken = true; this.error = `${CONFIG_FILE} has a typo: fix or delete it, then reopen Settings.`; }
       cx.notify();
     });
@@ -74,6 +82,8 @@ export class SettingsDialog {
   }
 
   close() { closeOverlay(this.overlay); }
+  // The Mac user's full name, as the watcher read it (lib/author.js), or herdr before its first pass.
+  osName() { return authorOf(null, shared("hermes-kanban.osName")); }
   set(key, v, cx) { this.draft[key] = v; cx.notify(); }
   snap() { return shared("hermes-kanban.boards")?.[this.machine] ?? null; }
 
@@ -265,6 +275,24 @@ export class SettingsDialog {
     return [single, assigned];
   }
 
+  // "Change name": off, comments carry the OS name, shown read only; on, a field prefilled with it. Off again clears the
+  // stored name.
+  author(t) {
+    const os = this.osName(), on = this.draft["author.custom"] === true, s = SETTINGS.find((x) => x.key === "author.custom");
+    const flip = (_e, cx) => {
+      if (on) { this.draft["author.custom"] = false; this.draft["author.name"] = null; }
+      else { this.draft["author.custom"] = true; this.draft["author.name"] = os; this.authorInput.set_value(os); this.authorInput.focus(); }
+      cx.notify();
+    };
+    const field = div().id("settings-author.name-field").w(220).px(10).py(6).rounded(7).border_1().border_color(t.border).cursor_text()
+      .child(Input.new(this.authorInput).w_full().text_size(13).text_color(t.foreground));
+    return [
+      row(t, "settings-author.custom", s.label, help(t, s.about), [toggle(t, "settings-author.custom-switch", on, flip)]),
+      row(t, "settings-author.name", "Current author", help(t, on ? "Hermes shows this name with each comment from this panel. 1 to 64 characters." : "Hermes shows this name with each comment from this panel."),
+        [on ? field : value(t, os)], true),
+    ];
+  }
+
   render() {
     const t = theme(), c = tones(t), ready = Boolean(this.draft);
     const instances = Object.values(shared("hermes-kanban.boards") ?? {}).filter((s) => s?.hermes).map((s) => s.machine);
@@ -274,6 +302,8 @@ export class SettingsDialog {
       this.switchRow(t, "update_check", true),
       heading(t, "Agents"),
       ...this.agents(t, c),
+      heading(t, "Comment author"),
+      ...this.author(t),
       heading(t, "Display"),
       this.choiceRow(t, "status.color", (x) => x[0].toUpperCase() + x.slice(1), true),
       heading(t, "Notifications"),

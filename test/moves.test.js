@@ -45,10 +45,10 @@ const blocked = task({ status: "blocked", assignee: "writer" });
 
 test("commentAndUnblock keeps the comment when the PATCH is refused", async () => {
   const api = fakeApi({ comment: { code: 200, json: { ok: true }, error: null }, patch: { code: 409, json: { detail: DETAIL }, error: null, task: null } });
-  const r = await commentAndUnblock(api, blocked, "Only v2.3 to v2.4");
+  const r = await commentAndUnblock(api, blocked, "Only v2.3 to v2.4", "Jane Doe");
   assert.deepEqual(r, { commented: true, moved: null, error: DETAIL });
   assert.deepEqual(api.calls.map((c) => c.verb), ["comment", "patch"], "the comment goes first");
-  assert.deepEqual(api.calls[0].payload, { body: "Only v2.3 to v2.4" });
+  assert.deepEqual(api.calls[0].payload, { body: "Only v2.3 to v2.4", author: "Jane Doe" });
   assert.deepEqual(api.calls[1].payload, { status: "ready" });
 });
 
@@ -79,11 +79,11 @@ test("commentAndUnblock sends both requests to the task's machine", async () => 
     return { code: 0, stdout: `${JSON.stringify(reply)}\n200`, stderr: "" };
   };
   const api = createApi(exec, (m) => ({ devbox: "gated", labbox: "open" })[m]);
-  const r = await commentAndUnblock(api, { ...blocked, machine: "labbox" }, "go");
+  const r = await commentAndUnblock(api, { ...blocked, machine: "labbox" }, "go", "Jane Doe");
   assert.equal(calls.length, 2);
   assert.deepEqual(calls.map((c) => c.opts.on), ["labbox", "labbox"]);
   assert.deepEqual(calls.map((c) => [c.args[4], new URL(c.args[5]).pathname.split("/").slice(-2).join("/")]), [["POST", "t_a1/comments"], ["PATCH", "tasks/t_a1"]]);
-  assert.equal(JSON.parse(calls[0].args[6]).author, "herdr");
+  assert.equal(JSON.parse(calls[0].args[6]).author, "Jane Doe");
   assert.equal(r.moved.machine, "labbox");
   assert.equal(r.moved.status, "ready");
 });
@@ -101,4 +101,10 @@ test("failureOf: Hermes' detail, else the transport error, else the HTTP code", 
   assert.equal(failureOf({ code: 422, json: { detail: [{ msg: "field required" }, { msg: "too long" }] }, error: null }), "field required; too long");
   assert.equal(failureOf({ code: 0, json: null, error: "timeout" }), "timeout");
   assert.equal(failureOf({ code: 500, json: null, error: null }), "HTTP 500");
+});
+
+test("commentAndUnblock passes the author with the comment", async () => {
+  const api = fakeApi({ comment: { code: 200, json: {}, error: null }, patch: { code: 409, json: { detail: DETAIL }, error: null, task: null } });
+  await commentAndUnblock(api, blocked, "hi", "Jane Doe");
+  assert.deepEqual(api.calls[0].payload, { body: "hi", author: "Jane Doe" });
 });

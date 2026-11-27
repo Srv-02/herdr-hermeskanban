@@ -164,6 +164,10 @@ test("the fake Hermes answers every call the panel makes", async () => {
   assert.equal((await exec(...Object.values(scriptSpec("devbox", SETUP_SCRIPT, ["hermes-gateway.service"])))).code, 0);
   assert.equal((await exec(...Object.values(restartSpec("devbox")))).code, 0);
   assert.notEqual((await exec("uname", ["-a"], { on: "devbox" })).code, 0, "anything else fails");
+
+  // The watcher reads the comment author on this computer with id: an invented name, never a real one.
+  assert.deepEqual(await exec("id", ["-F"]), { code: 0, stdout: "Jane Doe\n", stderr: "" });
+  assert.notEqual((await exec("id", ["-F"], { on: "devbox" })).code, 0, "id only on this computer");
 });
 
 test("the overlay scene opens the blocked release notes first", async () => {

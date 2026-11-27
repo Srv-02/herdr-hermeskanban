@@ -134,7 +134,7 @@ A click on a row opens the task in a large dialog. Everything in it goes to the 
 - **The head:** title, ID, the instance, Close (Esc); the status pill, the agent, `created 2h ago` and the number of comments.
 - **Left:** for a blocked task a red box with the reason (`writer is blocked`, `needs input: …`); the description; the activity (events and comments, newest first, heartbeats left out); and the comment box.
 - **Text from Hermes** (titles, descriptions, comments, reasons) is drawn as plain text, never as Markdown or HTML: anyone who can reach an instance can write a task. Line breaks stay; a bare `https` URL becomes a link that opens in your browser on a click. No picture or other resource is ever loaded.
-- **Comment** (or Ctrl+Enter) adds the comment as `herdr`. **Comment & unblock**, for a blocked task, adds the comment and then asks Hermes to move the task to Ready. These are two requests: when Hermes refuses the move (a parent task is not done, say), the comment stays and the line at the bottom says so.
+- **Comment** (or Ctrl+Enter) adds the comment under your name: the full name of your Mac user, or the name set under [Comment author](#settings) in the settings (`herdr` only when neither is there). **Comment & unblock**, for a blocked task, adds the comment and then asks Hermes to move the task to Ready. These are two requests: when Hermes refuses the move (a parent task is not done, say), the comment stays and the line at the bottom says so.
 - **Right column:**
   - **Agent (assignee):** the board's agents, each with `idle` or `1 running`, and `Unassigned`.
   - **Move to:** only the moves Hermes' workflow allows from the current status, read from Hermes, so they survive Hermes updates.
@@ -239,6 +239,8 @@ The gear at the right of the header opens the Settings dialog; **Save** writes t
 | `badge` | Dock badge | true / false | `false` | A dot (`•`) on the Herdr icon in the Dock while something that needs you is unseen. No number. |
 | `poll_seconds` | Check every | `15` / `30` / `60` / `120` | `30` | Seconds between two cheap checks of each visible instance. The board is read only when it changed. |
 | `update_check` | Check for updates automatically | true / false | `true` | Once a day, asks GitHub whether a new version exists. Nothing about you or your boards is sent, but GitHub sees your IP address. |
+| `author.custom` | Change name | true / false | `false` | Off: your comments carry the full name of your Mac user (`id -F`, else your login, else `herdr`). On: the name in `author.name`. |
+| `author.name` | Comment author | text, 1 to 64 characters | none | The name your comments carry while `author.custom` is on. Trimmed; an empty or longer name counts as none. |
 
 ```json
 {
@@ -250,6 +252,8 @@ The gear at the right of the header opens the Settings dialog; **Save** writes t
 ```
 
 A dotted key (`"toast.done": false`) works too. All settings are defined in one place, `mods/hermes-kanban/lib/settings.js`.
+
+**Comment author** in the dialog, between Agents and Display: the switch **Change name**, and below it the current author. Off, it shows your Mac user's full name, read only. Switching it on turns that into a field, prefilled with that name; an empty field is never saved and shows the last name again when you leave it. Switching it off goes back to the Mac name and clears the stored one.
 
 The dialog also shows, without a key of its own: **Default agent** of the shown instance, **Hermes instances** (every visible machine with a board) and **Remove access** (see [Remove access](#remove-access)).
 
@@ -272,8 +276,8 @@ The dialog also shows, without a key of its own: **Default agent** of the shown 
 - **API calls:** `curl` to `http://127.0.0.1:9120` and nowhere else.
   - `GET /api/status` (public, without key): version, gateway state, sign-in on or off.
   - Under `/api/plugins/kanban`, always with `?board=default`: `GET /board`, `/workflow`, `/orchestration`, `/diagnostics?severity=warning`, `/tasks/<id>`, and `/stats` to check access.
-  - **Writes, only on your click:** `PATCH /tasks/<id>` (status, also `archived`; agent; priority), `POST /tasks/<id>/comments` (author `herdr`), `POST /tasks`. Never `DELETE`. Task IDs are checked (`[A-Za-z0-9_-]`) before they reach a URL.
-- **The key never leaves the machine.** The remote shell builds the header itself, `{ printf 'Authorization: Bearer '; cat "$key"; } | curl … -H @-`: `printf` is a shell builtin and `cat` reads the file, so the key is in no command line (`ps`), never comes back to your Mac, and is in no output or log. Output from the machine that the panel shows (errors, the restart's log) is masked for anything that looks like a key. The request body (a comment, a title) is an argument of `curl` and so visible in the machine's process list for the moment of the call; the board is on that machine anyway.
+  - **Writes, only on your click:** `PATCH /tasks/<id>` (status, also `archived`; agent; priority), `POST /tasks/<id>/comments` (author: your name, see [Comment author](#settings)), `POST /tasks`. Never `DELETE`. Task IDs are checked (`[A-Za-z0-9_-]`) before they reach a URL.
+- **The key never leaves the machine.** The remote shell builds the header itself, `{ printf 'Authorization: Bearer '; cat "$key"; } | curl … -H @-`: `printf` is a shell builtin and `cat` reads the file, so the key is in no command line (`ps`), never comes back to your Mac, and is in no output or log. Output from the machine that the panel shows (errors, the restart's log) is masked for anything that looks like a key. The request body (a comment, a title) is an argument of `curl` and so visible in the machine's process list for the moment of the call; the board is on that machine anyway. The same holds for your name as a comment's author: it goes to each Hermes machine you comment on in the request body, and is visible there in `ps` for the moment of the call.
 - **The probe**, only when the board answers 401 or the gateway is down, when the settings open for an instance with sign-in, and right before a setup: `systemctl --user list-unit-files 'hermes-gateway*.service'` and `systemctl --user show -p MainPID`, `curl --version`, `command -v python3`, whether `~/.hermes`, the key and the drop-in exist, and whether the gateway's `/proc/<pid>/environ` holds the name `HERMES_DASHBOARD_SESSION_TOKEN` (`grep -q`: yes or no, never the value).
 - **Set up access**, on **Confirm**: `python3` makes the key only if `~/.hermes/dashboard.token` is missing (mode 0600); the drop-in `~/.config/systemd/user/<gateway unit>.d/herdr-kanban-token.conf` is written through a temporary file (mode 0600); then `systemctl --user daemon-reload`.
 - **Restart gateway**, on your click only: `hermes gateway restart`. It is the only `hermes` command the mod ever runs. Then `GET /api/status` every 2 seconds for up to about 100 seconds, and `GET /stats` with the key.
@@ -284,8 +288,8 @@ The dialog also shows, without a key of its own: **Default agent** of the shown 
 
 - **Files:** `hermes-kanban.json` in the Herdr app folder, written only by the Settings dialog. The filters and whether the second filter row is open are kept in the mod's own storage. The mod writes no cache file of its own, but Herdr keeps every shared value below in `shared.json` in the Herdr app folder, the last boards (`hermes-kanban.boards`) included.
 - **Network:** the daily update check (see [Updates](#updates)). Nothing else: every Hermes call runs on its machine.
-- **Programs:** `open` for an `https` link you click in a task.
-- **Shared values:** `workspace.panels` (adds `hermes-kanban` so the tab bar restores the panel), `hermes-kanban.boards` (the boards), `hermes-kanban.unseen` and `hermes-kanban.seen` (the dot), `hermes-kanban.shown` (which instance each panel shows), `hermes-kanban.lastPanes` (where a jump lands), `hermes-kanban.refresh` (poll a machine now), `hermes-kanban.restarting` (one gateway restart per machine at a time), `hermes-kanban.pick` (the agent menu), `hermes-kanban.config` (the dialog saved), `hermes-kanban.update` and `hermes-kanban.lease` (the update check and the polling copy).
+- **Programs:** `open` for an `https` link you click in a task; `id -F` (else `id -un`) once per start of the polling copy, for the name your comments carry.
+- **Shared values:** `workspace.panels` (adds `hermes-kanban` so the tab bar restores the panel), `hermes-kanban.boards` (the boards), `hermes-kanban.unseen` and `hermes-kanban.seen` (the dot), `hermes-kanban.shown` (which instance each panel shows), `hermes-kanban.lastPanes` (where a jump lands), `hermes-kanban.refresh` (poll a machine now), `hermes-kanban.restarting` (one gateway restart per machine at a time), `hermes-kanban.pick` (the agent menu), `hermes-kanban.config` (the dialog saved), `hermes-kanban.osName` (your Mac user's name, the comments' default author), `hermes-kanban.update` and `hermes-kanban.lease` (the update check and the polling copy).
 
 ## Removing
 

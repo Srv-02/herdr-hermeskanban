@@ -15,6 +15,7 @@ import { createApi } from "./lib/api.js";
 import { normalizeDetail } from "./lib/board.js";
 import { allowedMoves, outcomeText, commentAndUnblock, mergePatched, failureOf } from "./lib/moves.js";
 import { loadSettings, isSingleAgent } from "./lib/settings.js";
+import { authorOf } from "./lib/author.js";
 import { activityOf, blockReason, runLine, prioChoices, prioLabel } from "./lib/view.js";
 import { ago } from "./lib/time.js";
 
@@ -126,6 +127,8 @@ export class TaskViewer {
   }
 
   typedText() { return this.box.value().trim(); }
+  // Who the comment comes from: the settings' name, else the Mac user's (lib/author.js).
+  author() { return authorOf(this.settings, shared("hermes-kanban.osName")); }
   clearBox() { this.box.set_value(""); this.typed = false; }
   comment(cx) {
     const text = this.typedText();
@@ -133,7 +136,7 @@ export class TaskViewer {
     this.busy = "Commenting"; this.note = null;
     cx.spawn(async (cx) => {
       try {
-        const r = await this.api.act(this.task, "comment", { body: text });
+        const r = await this.api.act(this.task, "comment", { body: text, author: this.author() });
         if (ok(r)) { this.clearBox(); this.note = { text: "Comment added.", tone: null }; }
         else this.note = { text: `Comment not added: ${failureOf(r)}`, tone: "red" };
       } catch (e) {
@@ -153,7 +156,7 @@ export class TaskViewer {
     this.busy = "Commenting"; this.note = null;
     cx.spawn(async (cx) => {
       try {
-        const r = await commentAndUnblock(this.api, this.task, text);
+        const r = await commentAndUnblock(this.api, this.task, text, this.author());
         if (r.commented) this.clearBox();
         if (r.moved) {
           this.task = mergePatched(this.task, r.moved);

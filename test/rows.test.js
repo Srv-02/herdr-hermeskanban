@@ -47,8 +47,8 @@ test("the button and the watcher use the shared keys of the mod exactly", () => 
   const all = source("main.js") + source("watcher.js");
   const keys = new Set([...all.matchAll(/"(hermes-kanban\.[\w.]+)"/g)].map((m) => m[1]));
   for (const k of ["hermes-kanban.lease", "hermes-kanban.update", "hermes-kanban.boards", "hermes-kanban.unseen", "hermes-kanban.seen", "hermes-kanban.shown",
-    "hermes-kanban.refresh", "hermes-kanban.lastPanes", "hermes-kanban.config", "hermes-kanban.pick"]) assert.ok(keys.has(k), `${k} is used`);
-  for (const k of keys) assert.match(k, /^hermes-kanban\.(lease|update|boards|unseen|seen|shown|refresh|lastPanes|config|pick)$/, `unknown key ${k}`);
+    "hermes-kanban.refresh", "hermes-kanban.lastPanes", "hermes-kanban.config", "hermes-kanban.pick", "hermes-kanban.osName"]) assert.ok(keys.has(k), `${k} is used`);
+  for (const k of keys) assert.match(k, /^hermes-kanban\.(lease|update|boards|unseen|seen|shown|refresh|lastPanes|config|pick|osName)$/, `unknown key ${k}`);
   assert.match(source("main.js"), /mods\/hermes-kanban\/mod\.json/);
 });
 

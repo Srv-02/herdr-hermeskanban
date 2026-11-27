@@ -5,6 +5,7 @@
 
 import { BASE, KANBAN, parseResponse, requestSpec, withBoard } from "./request.js";
 import { normalizeTask, problemCount } from "./board.js";
+import { cleanAuthor } from "./author.js";
 
 export const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -57,10 +58,11 @@ export function createApi(exec, mode) {
       if (!Object.keys(body).length) throw new Error("a patch needs status, assignee or priority");
       return kanban(machine, "PATCH", path, body).then(withTask(machine));
     },
-    comment(machine, id, body) {
+    // `author` (lib/author.js authorOf) is trimmed and cut to 64 characters; without one the comment is herdr's.
+    comment(machine, id, body, author) {
       const path = `/tasks/${idPath(id)}/comments`;
       if (typeof body !== "string" || !body.trim()) throw new Error("a comment needs a text body");
-      return kanban(machine, "POST", path, { body, author: "herdr" });
+      return kanban(machine, "POST", path, { body, author: cleanAuthor(author) ?? "herdr" });
     },
     create(machine, fields) {
       return kanban(machine, "POST", "/tasks", pick(fields, ["title", "body", "priority", "assignee"])).then(withTask(machine));
@@ -69,7 +71,7 @@ export function createApi(exec, mode) {
     act(task, verb, payload) {
       if (typeof task?.machine !== "string" || !task.machine) throw new Error("the task has no machine");
       if (verb === "patch") return api.patch(task.machine, task.id, payload);
-      if (verb === "comment") return api.comment(task.machine, task.id, payload?.body);
+      if (verb === "comment") return api.comment(task.machine, task.id, payload?.body, payload?.author);
       throw new Error(`unknown verb ${verb}`);
     },
   };
