@@ -362,8 +362,8 @@ test("the settings dialog is ghchecker's", () => {
 });
 
 // The filter bar: one row always shown (state, the agents menu, the search over the rest with a clear button while
-// it has text); the filter button adds a second row below a divider line with priority and grouping.
-test("the filter bar: one row always, priority and grouping behind the filter button", () => {
+// it has text); the filter button adds a second row below a divider line with priority, grouping and the sort toggle.
+test("the filter bar: one row always, priority, grouping and sorting behind the filter button", () => {
   const src = source("main.js"), bar = src.slice(src.indexOf("filterBar(t, agents"), src.indexOf("// ---- drawing: the list"));
   const rows = bar.split(".child(h_flex().gap(");
   assert.equal(rows.length - 1, 2, "two rows");
@@ -399,7 +399,7 @@ test("single agent mode shows no agent names", () => {
   assert.match(watcher, /toastOf\(c, \{ single: isSingleAgent\(w\.settings, c\.machine\) \}\)/);
 });
 
-// As ghchecker's: while the priority and grouping row is closed and one of them is not its default, the filter icon
+// As ghchecker's: while the priority, grouping and sorting row is closed and one of them is not its default, the filter icon
 // carries the grey 6 px dot.
 test("the filter button marks hidden filters with ghchecker's dot", () => {
   const src = source("main.js");
