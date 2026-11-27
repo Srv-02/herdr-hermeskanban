@@ -31,12 +31,28 @@ export function pickedAgents(picked, agents, single) {
   return picked.filter((x) => x === "none" || agents.includes(x));
 }
 
-// Hermes dispatches higher priority first, the oldest first among equals.
-const byUrgency = (a, b) => (b.priority ?? 0) - (a.priority ?? 0) || (a.createdAt ?? Infinity) - (b.createdAt ?? Infinity);
+// The time a row shows and sorts by: a done task's completion (its creation when Hermes has none), any other task's
+// creation. Null without one. One rule for both, so the order and the ages never drift apart.
+export function shownTime(task) {
+  const at = task.status === "done" ? task.completedAt ?? task.createdAt : task.createdAt;
+  return typeof at === "number" && Number.isFinite(at) ? at : null;
+}
+
+// The sort order of the rows: "newest" (the default) or "oldest". A stored value of an older version counts as newest.
+export const sortOf = (value) => (value === "oldest" ? "oldest" : "newest");
+
+// By the shown time in that direction; tasks without a time last either way, equal times by id.
+const byTime = (sort) => (a, b) => {
+  const x = shownTime(a), y = shownTime(b);
+  const byId = a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  if (x === null || y === null) return x === y ? byId : x === null ? 1 : -1;
+  return (sortOf(sort) === "oldest" ? x - y : y - x) || byId;
+};
 
 // Groups without tasks are left out. `labels` (normalizeWorkflow().labels) is optional: the key shows without one.
-export function groupTasks(tasks, by, order, labels = {}) {
-  const sorted = [...tasks].sort(byUrgency);
+// Inside each group the rows go by time (`sort`: newest or oldest first); priority only filters.
+export function groupTasks(tasks, by, order, labels = {}, sort = "newest") {
+  const sorted = [...tasks].sort(byTime(sort));
   const make = (key, label, list) => ({ key, label, count: list.length, needsYou: by === "status" && NEEDS_YOU.includes(key), tasks: list });
   if (by === "none") return sorted.length ? [make("all", "All", sorted)] : [];
   if (by === "agent") {

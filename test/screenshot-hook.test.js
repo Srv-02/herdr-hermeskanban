@@ -15,6 +15,9 @@ import { createPoller } from "../mods/hermes-kanban/lib/poller.js";
 import { defaults } from "../mods/hermes-kanban/lib/settings.js";
 import { PROBE_SCRIPT, SETUP_SCRIPT, parseProbe, pickUnit, restartSpec, scriptSpec } from "../mods/hermes-kanban/lib/setup.js";
 import { normalizeDetail } from "../mods/hermes-kanban/lib/board.js";
+import { groupTasks } from "../mods/hermes-kanban/lib/view.js";
+
+const ORDER_OF_HERMES = ["triage", "todo", "scheduled", "ready", "running", "blocked", "review", "done"];
 
 const root = path.resolve(import.meta.dirname, "..");
 const mod = path.join(root, "mods/hermes-kanban");
@@ -167,7 +170,8 @@ test("the overlay scene opens the blocked release notes first", async () => {
   const { first } = await poll({ scene: "overlay" }, ["devbox"]);
   const open = first.snapshots.devbox.board.tasks.filter((t) => t.status !== "done");
   assert.ok(open.every((t) => !["triage", "todo", "scheduled", "ready", "running"].includes(t.status)));
-  const top = open.filter((t) => t.status === "blocked").sort((a, b) => b.priority - a.priority)[0];
+  // As the panel orders it: the first group's first row, newest first.
+  const top = groupTasks(open, "status", ORDER_OF_HERMES)[0].tasks[0];
   assert.equal(top.title, "Draft release notes for v2.4");
 });
 

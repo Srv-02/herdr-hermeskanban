@@ -42,7 +42,7 @@ The [guide](docs/GUIDE.md#requirements) lists every detail.
 - The panel always shows the Hermes of the machine you are on. Any pane there works, a plain shell too.
 - Tasks are grouped as in Hermes: Triage, Todo, Scheduled, Ready, Running, Blocked, Review, Done.
 - You can also group them by agent, or not at all.
-- The most important tasks come first.
+- The newest tasks come first. One click on the sort toggle shows the oldest first.
 - Each row tells you what is going on, for example why a task is blocked.
 - Filter by open or done tasks, by agent, by priority, or search by text.
 - The bar at the bottom shows how many tasks run and whether Hermes is up.

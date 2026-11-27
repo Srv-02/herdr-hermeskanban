@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { NEEDS_YOU, OPEN_DONE, filterTasks, groupTasks, hintOf, prioLabel, agentsLabel, toggleAgent, pickedAgents } from "../mods/hermes-kanban/lib/view.js";
+import { NEEDS_YOU, OPEN_DONE, filterTasks, groupTasks, hintOf, prioLabel, agentsLabel, toggleAgent, pickedAgents, shownTime, sortOf } from "../mods/hermes-kanban/lib/view.js";
 
 const ORDER = ["triage", "todo", "scheduled", "ready", "running", "blocked", "review", "done"];
 const t = (id, o = {}) => ({
@@ -23,9 +23,39 @@ test("groupTasks: Hermes order, empty groups hidden, blocked and review need you
   assert.equal(g[0].count, 3);
 });
 
-test("groupTasks: higher priority first, then oldest first", () => {
+test("groupTasks: newest first by default, priority does not sort, equal times by id", () => {
   const g = groupTasks(tasks, "status", ORDER);
-  assert.deepEqual(g[0].tasks.map((x) => x.id), ["t_6", "t_5", "t_3"]);
+  assert.deepEqual(g[0].tasks.map((x) => x.id), ["t_3", "t_5", "t_6"]);
+  assert.deepEqual(groupTasks(tasks, "status", ORDER, {}, "oldest")[0].tasks.map((x) => x.id), ["t_6", "t_3", "t_5"]);
+});
+
+// The time a row shows: a done task's completion (else its creation), any other task's creation.
+test("shownTime: completedAt for done, falling back to createdAt; createdAt otherwise", () => {
+  assert.equal(shownTime(t("a", { status: "done", createdAt: 10, completedAt: 90 })), 90);
+  assert.equal(shownTime(t("a", { status: "done", createdAt: 10, completedAt: null })), 10);
+  assert.equal(shownTime(t("a", { status: "running", createdAt: 10, completedAt: 90 })), 10);
+  assert.equal(shownTime(t("a", { createdAt: undefined })), null);
+});
+
+test("groupTasks sorts every grouping by the shown time, both directions", () => {
+  const list = [
+    t("t_a", { status: "done", assignee: "coder", createdAt: 10, completedAt: 500 }),
+    t("t_b", { status: "done", assignee: "coder", createdAt: 300, completedAt: 400 }),
+    t("t_c", { status: "todo", assignee: "coder", createdAt: 450 }),
+    t("t_d", { status: "todo", createdAt: 20, priority: 4 }),
+  ];
+  const ids = (g) => g.map((x) => x.tasks.map((y) => y.id));
+  assert.deepEqual(ids(groupTasks(list, "status", ORDER)), [["t_c", "t_d"], ["t_a", "t_b"]]);
+  assert.deepEqual(ids(groupTasks(list, "status", ORDER, {}, "oldest")), [["t_d", "t_c"], ["t_b", "t_a"]]);
+  assert.deepEqual(ids(groupTasks(list, "agent", ORDER)), [["t_a", "t_c", "t_b"], ["t_d"]]);
+  assert.deepEqual(ids(groupTasks(list, "agent", ORDER, {}, "oldest")), [["t_b", "t_c", "t_a"], ["t_d"]]);
+  assert.deepEqual(ids(groupTasks(list, "none", ORDER)), [["t_a", "t_c", "t_b", "t_d"]]);
+  assert.deepEqual(ids(groupTasks(list, "none", ORDER, {}, "oldest")), [["t_d", "t_b", "t_c", "t_a"]]);
+});
+
+test("sortOf: newest or oldest, anything else is newest", () => {
+  assert.equal(sortOf("oldest"), "oldest");
+  for (const v of ["newest", undefined, null, "priority", 7, ""]) assert.equal(sortOf(v), "newest");
 });
 
 test("groupTasks: unknown status goes last, labels optional", () => {
@@ -95,9 +125,10 @@ test("NEEDS_YOU and OPEN_DONE", () => {
   assert.ok(OPEN_DONE.done(t("a", { status: "done" })) && OPEN_DONE.all(t("a")));
 });
 
-test("groupTasks: a task without createdAt sorts after dated ones of equal priority", () => {
-  const list = [t("t_n", { createdAt: null }), t("t_new", { createdAt: 200 }), t("t_old", { createdAt: 10 })];
-  assert.deepEqual(groupTasks(list, "none", ORDER)[0].tasks.map((x) => x.id), ["t_old", "t_new", "t_n"]);
+test("groupTasks: a task without a time goes last in both directions", () => {
+  const list = [t("t_n", { createdAt: null }), t("t_new", { createdAt: 200 }), t("t_m", { createdAt: undefined }), t("t_old", { createdAt: 10 })];
+  assert.deepEqual(groupTasks(list, "none", ORDER)[0].tasks.map((x) => x.id), ["t_new", "t_old", "t_m", "t_n"]);
+  assert.deepEqual(groupTasks(list, "none", ORDER, {}, "oldest")[0].tasks.map((x) => x.id), ["t_old", "t_new", "t_m", "t_n"]);
 });
 
 test("hintOf: a missing default assignee reads like an empty one", () => {

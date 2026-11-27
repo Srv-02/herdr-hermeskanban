@@ -19,7 +19,7 @@ import { loadSettings, defaults, isSingleAgent } from "./lib/settings.js";
 import { createUpdateGate, updateCheck, fetchLatest, localVersion, gearState } from "./lib/update.js";
 import { leaseNext } from "./lib/lease.js";
 import { focusedInstance, visibleMachines, jumpTarget, rememberPane, buttonAction } from "./lib/instances.js";
-import { filterTasks, groupTasks, hintOf, prioLabel, agentsLabel, toggleAgent, pickedAgents } from "./lib/view.js";
+import { filterTasks, groupTasks, hintOf, prioLabel, agentsLabel, toggleAgent, pickedAgents, shownTime, sortOf } from "./lib/view.js";
 import { taskKey } from "./lib/board.js";
 import { ago } from "./lib/time.js";
 import { refreshState, staleFor } from "./lib/poller.js";
@@ -31,7 +31,7 @@ const ROW = 46, HEADING = 32;
 const CLEAR = "#00000000";
 // Hermes' column order (hermes_cli/kanban_workflow.py), for a board whose /workflow has not come yet.
 const ORDER = ["triage", "todo", "scheduled", "ready", "running", "blocked", "review", "done"];
-const FILTERS = { state: "open", agents: [], prio: "all", group: "status" };
+const FILTERS = { state: "open", agents: [], prio: "all", group: "status", sort: "newest" };
 
 const remembered = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key) ?? "null") ?? fallback; } catch { return fallback; } };
 const keep = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage full: memory only */ } };
@@ -83,6 +83,7 @@ export default class HermesKanban extends View {
     this.settings = defaults(); // hermes-kanban.json, read at start and after Save in the settings
     this.access = new Access(); // the flows of "Set up access", one per machine (access.js)
     this.f = { ...FILTERS, ...remembered("filters", {}) };
+    this.f.sort = sortOf(this.f.sort); // the stored filters merge unchecked: an unknown order is newest
     this.filtering = remembered("filtering", false);
     this.query = "";
     this.input = InputState.new({ placeholder: "Search" });
@@ -94,7 +95,7 @@ export default class HermesKanban extends View {
     this.readSettings(cx);
     readTextFile(`${appHome()}/mods/hermes-kanban/mod.json`).then((text) => { this.version = localVersion(text); cx.notify(); }, () => null);
     cx.timer.every(TICK, (cx) => this.tick(cx));
-    // keys.json: "alt-h r": "hermes-kanban.refresh", or filter (show or hide the second filter row: priority and grouping), settings, new (a new task
+    // keys.json: "alt-h r": "hermes-kanban.refresh", or filter (show or hide the second filter row: priority, grouping and sorting), settings, new (a new task
     // on the shown instance), open (the first row).
     cx.spawn(async (cx) => {
       for (;;) {
@@ -272,6 +273,7 @@ export default class HermesKanban extends View {
     const tip = busy ? "Refreshing…" : failed ? `Sync failed: ${snap.error}. Click to try again.`
       : nopoll ? "No poll came within 30 s. After a Herdr restart or a mod update polling resumes within 3 minutes. Click to try again." : "Refresh";
     // As ghchecker's: a grey dot on the filter icon while the closed second row holds a value other than its default.
+    // The sort order is a view, not a filter: it never sets the dot.
     const hiddenSet = !this.filtering && (this.f.prio !== "all" || this.f.group !== "status");
     return h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
       .child(h_flex().flex_none().gap(7).items_center().font_semibold().child(glyph("kanban", 14, t.foreground)).child("Hermes"))
@@ -279,7 +281,7 @@ export default class HermesKanban extends View {
       .when(Boolean(machine), (x) => x
         .child(this.headButton("new", "plus", false, "New task", () => this.openCreate(machine), t, c))
         .child(this.headButton("refresh", "refresh", false, tip, (cx) => { this.refresh(machine); cx.notify(); }, t, c, { spin: busy, alarm: failed || nopoll }))
-        .child(this.headButton("filter", "filter", this.filtering, this.filtering ? "Hide priority and grouping" : "Priority and grouping",
+        .child(this.headButton("filter", "filter", this.filtering, this.filtering ? "Hide priority, grouping and sorting" : "Priority, grouping and sorting",
           (cx) => { this.setFiltering(!this.filtering); cx.notify(); }, t, c, { marked: hiddenSet })))
       // Settings, also without a Hermes; gold with a slow shine while a newer release is out.
       .child(this.headButton("settings", "settings", false, gear.tip, () => this.openSettings(machine), t, c, { gold: gear.update }));
@@ -329,8 +331,9 @@ export default class HermesKanban extends View {
 
   // The filter bar, always shown, one row: state, the agents (a menu that picks several: an instance can have any
   // number of profiles; not in single agent mode) and the search over the rest of the width, with a clear button
-  // while it has text. The filter button adds a second row below a divider line: priority and grouping (by agent not
-  // in single agent mode).
+  // while it has text. The filter button adds a second row below a divider line: priority, grouping (by agent not
+  // in single agent mode) and at its end the sort toggle (newest or oldest first). The row does not wrap: it fits
+  // a 420 px panel.
   filterBar(t, agents, picked, single) {
     const label = (text) => div().flex_none().mr(6).text_size(11).text_color(t.muted).child(text);
     const pick = (patch) => (_k, cx) => { this.setFilter(patch(_k)); cx.notify(); };
@@ -354,7 +357,10 @@ export default class HermesKanban extends View {
         .child(segmented("prio", [["all", "All"], ["p1", "P1"], ["p2", "P2"], ["p3+", "P3+"]], this.f.prio, t, pick((k) => ({ prio: k }))))
         .child(div().flex_1())
         .child(label("Group"))
-        .child(segmented("group", [["status", "Status"], ...(single ? [] : [["agent", "Agent"]]), ["none", "None"]], single && this.f.group === "agent" ? "status" : this.f.group, t, pick((k) => ({ group: k }))))));
+        .child(segmented("group", [["status", "Status"], ...(single ? [] : [["agent", "Agent"]]), ["none", "None"]], single && this.f.group === "agent" ? "status" : this.f.group, t, pick((k) => ({ group: k }))))
+        .child(div().w(4).flex_none())
+        .child(this.headButton("sort", "arrow-up-down", false, this.f.sort === "oldest" ? "Oldest first" : "Newest first",
+          (cx) => { this.setFilter({ sort: this.f.sort === "oldest" ? "newest" : "oldest" }); cx.notify(); }, t, tones(t)))));
   }
 
   // ---- drawing: the list ----
@@ -366,7 +372,7 @@ export default class HermesKanban extends View {
   }
   taskRow(task, key, size, x) {
     const { t, c, mono } = x, s = look(task.status, t, c, mono), hint = hintOf(task, x.defaultAssignee, { single: x.single }), prio = prioLabel(task.priority);
-    const age = ago(task.status === "done" ? task.completedAt ?? task.createdAt : task.createdAt, Date.now() / 1000);
+    const age = ago(shownTime(task), Date.now() / 1000);
     const meta = [task.id, x.single ? null : task.assignee ?? "—", age].filter(Boolean).join(" · ");
     const tint = hint && (hint.tone === "red" ? c.red : mono ? t.muted : c[hint.tone] ?? t.muted);
     return this.row(key, size, t).child(glyphOf(s.icon, 15, s.color))
@@ -410,7 +416,7 @@ export default class HermesKanban extends View {
       const text = narrowed ? "No tasks match" : { open: "No open tasks", done: "No done tasks" }[this.f.state] ?? "No tasks";
       return box.child(div().px(16).py(28).text_size(12).text_center().text_color(t.dim).child(text));
     }
-    const groups = groupTasks(tasks, group, snap.workflow?.order ?? ORDER, snap.workflow?.labels ?? {});
+    const groups = groupTasks(tasks, group, snap.workflow?.order ?? ORDER, snap.workflow?.labels ?? {}, this.f.sort);
     const items = this.entries = this.entriesOf(groups, { t, c, mono: this.settings["status.color"] === "mono", defaultAssignee: snap.defaultAssignee, single, group });
     const byKey = new Map(items.map((x) => [x.key, x]));
     const id = `list-${machine}`;

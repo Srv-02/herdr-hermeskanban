@@ -75,7 +75,7 @@ Then focus a pane on a machine that runs Hermes and click `Hermes` in the tab ba
 - **Clicking into the panel** (the search, say) keeps the board: a mod has the keyboard then, not a pane.
 - **The `Hermes` button** opens and closes the panel on any pane of a machine that runs Hermes, and also while you work in the panel. On any other pane it is grey with the tooltip `No Hermes on this machine`, and a click does nothing, except that it still closes a panel that is open. While another instance needs you, a click jumps there instead (see [Notifications](#notifications)).
 - The panel follows a change of focus within 3 seconds at the latest.
-- **The header:** `Hermes`, the instance's name on the right, then `+` (new task), refresh, the funnel (priority and grouping) and the gear (settings). Without a Hermes only the gear stays.
+- **The header:** `Hermes`, the instance's name on the right, then `+` (new task), refresh, the funnel (priority, grouping and sorting) and the gear (settings). Without a Hermes only the gear stays.
 
 ### Instances
 
@@ -108,7 +108,7 @@ At the bottom: `3 running · 1 problem` on the left, followed by `synced 4m ago`
 
 - **Group `Status`** (the default): Triage, Todo, Scheduled, Ready, Running, Blocked, Review, Done, in the order and with the names of Hermes' workflow. Groups without tasks are left out. Blocked and Review carry the red alert: they need you.
 - **Group `Agent`:** one group per agent in alphabetical order, `no agent` last. **Group `None`:** one list.
-- **Order** in every group as Hermes' dispatcher picks: the highest priority first (Hermes starts a higher number first), the oldest first among equals.
+- **Order** in every group by the time the row shows: when a done task finished (when it was created, if Hermes has no finish time), when any other task was created. Newest first by default; the sort toggle at the end of the funnel's row turns it to oldest first. Tasks without a time go last, equal times by ID. Priority does not sort; it is a filter and the chip on the row.
 - **Colors** as Hermes' own board: Triage and Done in the theme's dim grey, Todo muted, Scheduled violet, Ready blue, Running green and turning, Blocked and Review red. With [`status.color`](#settings) `mono` everything is one quiet color except what needs you. All colors come from the theme, so light and dark themes work.
 
 ### Rows
@@ -124,7 +124,7 @@ At the bottom: `3 running · 1 problem` on the left, followed by `synced 4m ago`
 ### Filter
 
 - **Always shown, one row:** `Open | Done | All`; the agent menu (`All agents`, each agent with a check box, `no agent`; the button reads `All agents`, the agent's name, or `2 agents`); and the search over the rest of the width. The search looks at ID, title and agent; the `×` clears it.
-- **The funnel** in the header opens a second row below a divider: `Prio` `All | P1 | P2 | P3+` (Hermes' own numbers: `P3+` is 3 and higher) and `Group` `Status | Agent | None`. A grey dot on the funnel says that a value there differs from the default while the row is closed.
+- **The funnel** in the header opens a second row below a divider: `Prio` `All | P1 | P2 | P3+` (Hermes' own numbers: `P3+` is 3 and higher) and `Group` `Status | Agent | None`, and at its end the sort toggle (the up and down arrows; the tooltip says `Newest first` or `Oldest first`, a click turns it round). A grey dot on the funnel says that a priority or grouping there differs from the default while the row is closed; the sort order never sets it.
 - The filters and the open row are remembered; the search is not. An agent picked on one instance filters nothing on an instance that does not have it.
 
 ## Task overlay
@@ -219,7 +219,7 @@ The panel takes these commands, for `keys.json` (`"alt-h r": "hermes-kanban.refr
 | Command | What it does |
 |---|---|
 | `hermes-kanban.refresh` | Polls the shown instance now |
-| `hermes-kanban.filter` | Shows or hides the second filter row (priority and grouping) |
+| `hermes-kanban.filter` | Shows or hides the second filter row (priority, grouping and sorting) |
 | `hermes-kanban.settings` | Opens the Settings dialog |
 | `hermes-kanban.new` | Opens `New task` on the shown instance |
 | `hermes-kanban.open` | Opens the first task of the list in its overlay |
