@@ -22,13 +22,14 @@ W=860
 # The board: header 42, filter bar 39, 4 headings and 7 rows (458 with the list's padding), status bar 30, plus 88 around
 # the panel. The notifications add the 32 points of the "labbox needs you" strip.
 H_HERO=600 H_BOARD=657 H_NOTIFY=689
-# The overlay and the dialog get windows of their own: the task overlay is 0.9 H tall, the settings dialog 0.9 H.
-H_OVERLAY=896 H_DIALOG=940
+# The overlay and the dialog get windows of their own: the task overlay is 0.9 H tall, the settings dialog 0.9 H. The dialog
+# scrolls; 1130 is the tallest window a 1800 x 1169 point screen allows (macOS clamps a taller one), down to the toast row.
+H_OVERLAY=896 H_DIALOG=1130
 # Boxes in raw pixels "y x width height", measured on the raw shots: the Hermes button at the right end of the tab bar, the
 # task overlay and the settings dialog. Check them on tmp/shots-raw/*.png after a new layout.
 BUTTON_BOX="12 1542 160 58"
 OVERLAY_BOX="90 104 1512 1612"
-DIALOG_BOX="95 241 1238 1690"
+DIALOG_BOX="114 241 1238 2032"
 CARDS="hero board overlay notifications settings"
 ONLY="$*"
 for w in $ONLY; do
@@ -122,6 +123,6 @@ if want notifications && [ -f "$RAW/notifications.png" ]; then
 fi
 if want settings && [ -f "$RAW/settings-dialog.png" ]; then
   # shellcheck disable=SC2086
-  box settings-dialog $DIALOG_BOX settings-dialog; render settings "$ROOT/screenshots/settings.png" 1022 965
+  box settings-dialog $DIALOG_BOX settings-dialog; render settings "$ROOT/screenshots/settings.png" 1022 1136
 fi
 echo "rendered into screenshots/ and preview.png. Look at every image before you commit it: no user name, no real path, no real host."
