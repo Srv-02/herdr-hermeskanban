@@ -5,13 +5,13 @@ import {
 } from "../mods/hermes-kanban/lib/settings.js";
 
 test("defaults", () => assert.deepEqual(defaults(), { single_agent: [], "status.color": "color", "toast.needs_you": true,
-  "toast.done": true, "sound.needs_you": true, "sound.done": false, badge: false, poll_seconds: 30, update_check: true }));
+  "toast.done": true, "sound.needs_you": true, "sound.done": false, badge: false, poll_seconds: 30, update_check: true, "author.custom": false, "author.name": null }));
 
 test("every setting has a key, a type, a default and a description", () => {
   assert.equal(CONFIG_FILE, "hermes-kanban.json");
   for (const s of SETTINGS) {
     assert.match(s.key, /^[a-z_]+(\.[a-z_]+)?$/);
-    assert.ok(["boolean", "machines", "choice"].includes(s.type), s.key);
+    assert.ok(["boolean", "machines", "choice", "text"].includes(s.type), s.key);
     assert.ok(s.label, s.key);
     assert.ok(s.about.length > 10, s.key);
     assert.ok("default" in s, s.key);
@@ -98,4 +98,29 @@ test("changedSettings: only what differs goes to the file", () => {
   const before = defaults();
   assert.deepEqual(changedSettings(before, { ...before }), {});
   assert.deepEqual(changedSettings(before, { ...before, badge: true, single_agent: ["devbox"] }), { badge: true, single_agent: ["devbox"] });
+});
+
+// The comment author: a text of 1 to 64 characters, trimmed; anything else is invalid and means no custom name.
+test("author.name: trimmed, 1 to 64 characters, else invalid", () => {
+  assert.equal(parseSettings('{ "author": { "name": "  Jane Doe " } }').values["author.name"], "Jane Doe");
+  assert.equal(parseSettings(JSON.stringify({ "author.name": "z".repeat(64) })).values["author.name"], "z".repeat(64));
+  for (const bad of ["", "   ", "z".repeat(65), 7, null, ["Jane"]]) {
+    const r = parseSettings(JSON.stringify({ "author.name": bad }));
+    assert.equal(r.values["author.name"], null, JSON.stringify(bad));
+    if (bad !== null) assert.deepEqual(r.problems, ["author.name"]);
+  }
+  assert.equal(parseSettings('{ "author": { "custom": true } }').values["author.custom"], true);
+  assert.deepEqual(parseSettings('{ "author.custom": "yes" }').problems, ["author.custom"]);
+});
+
+test("withSettings: a custom name is written trimmed-checked, and null clears it", () => {
+  const set = JSON.parse(withSettings('{ "badge": true }', { "author.custom": true, "author.name": "ACME Ops" }));
+  assert.deepEqual(set, { badge: true, author: { custom: true, name: "ACME Ops" } });
+  const cleared = JSON.parse(withSettings(JSON.stringify(set), { "author.custom": false, "author.name": null }));
+  assert.deepEqual(cleared, { badge: true, author: { custom: false } });
+  // A dotted key the person wrote goes too.
+  assert.deepEqual(JSON.parse(withSettings('{ "author.name": "Jane Doe" }', { "author.name": null })), {});
+  assert.throws(() => withSettings("{}", { "author.name": "" }), /not a setting/);
+  assert.throws(() => withSettings("{}", { "author.name": "z".repeat(65) }), /not a setting/);
+  assert.throws(() => withSettings("{}", { badge: null }), /not a setting/, "only a setting without a default clears");
 });

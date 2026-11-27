@@ -4,7 +4,7 @@
 // herdr-app check; this file registers no timer.
 //
 // Shared keys: hermes-kanban.boards (Record<machine, Snapshot>), hermes-kanban.unseen (Record<machine, { needs, done }>),
-// hermes-kanban.lastPanes (Record<machine, paneId>), written here; hermes-kanban.seen (Record<machine, at>, the panel), hermes-kanban.shown (Record<panel copy, { machine, at }>, the panels),
+// hermes-kanban.lastPanes (Record<machine, paneId>), hermes-kanban.osName (the comment author from the OS), written here; hermes-kanban.seen (Record<machine, at>, the panel), hermes-kanban.shown (Record<panel copy, { machine, at }>, the panels),
 // hermes-kanban.refresh ({ machine, at }, panel or overlay after an action), hermes-kanban.config ({ at }, after
 // Save in the settings), read here.
 import { spaces, panes, focused, exec, notify, playSound, setBadge, shared, setShared, readTextFile, appHome } from "herdr";
@@ -13,6 +13,7 @@ import { createPoller } from "./lib/poller.js";
 import { loadSettings, isSingleAgent } from "./lib/settings.js";
 import { visibleMachines, focusedInstance, jumpTarget, rememberPane } from "./lib/instances.js";
 import { toastOf, alertsOf, nextUnseen, badgeOf, shownMachines } from "./lib/changes.js";
+import { readOsName } from "./lib/author.js";
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -32,6 +33,12 @@ function start(w) {
 
 async function once(w) {
   if (!w.poller) start(w);
+  // The comment author's default, once per start: the Mac user's full name (lib/author.js). The task overlay and
+  // the settings read it from there.
+  if (w.osName === undefined) {
+    w.osName = await readOsName(exec);
+    if (shared("hermes-kanban.osName") !== w.osName) setShared("hermes-kanban.osName", w.osName);
+  }
   const config = shared("hermes-kanban.config");
   if (!w.settings || (config?.at && config.at !== w.configAt)) {
     w.configAt = config?.at;

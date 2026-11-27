@@ -66,7 +66,7 @@ scene() {
 if [ "${CROP_ONLY:-0}" != 1 ]; then
 trap cleanup EXIT
 mkdir -p "$RAW"
-# Hero and board: the open tasks of devbox grouped by status, as Hermes orders them.
+# Hero and board: the open tasks of devbox grouped by status, newest first.
 if want hero; then scene $H_HERO; shot hero; fi
 if want board; then scene $H_BOARD; shot board; fi
 # Overlay: the first row, the blocked release notes, in its overlay (the scene leaves out the ready and running tasks).

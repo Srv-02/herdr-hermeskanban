@@ -42,7 +42,7 @@ The [guide](docs/GUIDE.md#requirements) lists every detail.
 - The panel always shows the Hermes of the machine you are on. Any pane there works, a plain shell too.
 - Tasks are grouped as in Hermes: Triage, Todo, Scheduled, Ready, Running, Blocked, Review, Done.
 - You can also group them by agent, or not at all.
-- The most important tasks come first.
+- The newest tasks come first. One click on the sort toggle shows the oldest first.
 - Each row tells you what is going on, for example why a task is blocked.
 - Filter by open or done tasks, by agent, by priority, or search by text.
 - The bar at the bottom shows how many tasks run and whether Hermes is up.
@@ -56,7 +56,7 @@ More in the guide: [The board](docs/GUIDE.md#the-board).
 - Click a task to open it in a large window.
 - You see its description, its history and its comments.
 - A blocked task shows why it is blocked, in a red box.
-- Write a comment, or comment and unblock the task in one step.
+- Write a comment, or comment and unblock the task in one step. Comments carry the full name of your Mac user, or a name you set in the settings.
 - Assign an agent, change the priority or move the task. You only see the moves that Hermes allows.
 - Archive a task. A second click confirms it. The mod never deletes a task.
 - The `+` button in the header creates a new task.
@@ -79,7 +79,7 @@ More in the guide: [Task overlay](docs/GUIDE.md#task-overlay).
 - On a pane of a machine that runs Hermes, it opens or closes the panel.
 - On any other pane, the button is grey. Its tooltip says `No Hermes on this machine`. Panes on your Mac count as such.
 - If the panel is open there, a click still closes it.
-- When another Hermes needs you, the tooltip says `Go to labbox`, for example. One click jumps to that machine and opens the panel there. This works from any pane.
+- When another Hermes has a dot, the tooltip says `Go to labbox`, for example. One click jumps to that machine and opens the panel there. A red dot comes before a green one. This works from any pane.
 - Inside the panel, a red strip `labbox needs you` with `Go to pane →` does the same.
 
 More in the guide: [Notifications](docs/GUIDE.md#notifications).
@@ -102,6 +102,7 @@ More in the guide: [Set up access](docs/GUIDE.md#set-up-access) and [Remove acce
 - The gear in the panel header opens the settings.
 - Choose status colors, toasts, sounds, the Dock dot and how often the panel checks for news.
 - Single agent mode hides agent names for a Hermes with only one agent.
+- Change the name your comments carry.
 - Once a day the panel checks GitHub for a new version. You can switch that off.
 
 More in the guide: [Settings](docs/GUIDE.md#settings) and [Single agent mode](docs/GUIDE.md#single-agent-mode).

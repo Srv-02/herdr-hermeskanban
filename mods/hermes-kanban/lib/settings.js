@@ -25,6 +25,10 @@ export const SETTINGS = [
     about: "Seconds between two cheap checks of each visible instance. The board is fetched only when it changed." },
   { key: "update_check", type: "boolean", default: true, label: "Check for updates automatically",
     about: "Once a day, Hermes Kanban asks GitHub whether a new version exists. Nothing about you or your boards is sent, but GitHub sees your IP address." },
+  { key: "author.custom", type: "boolean", default: false, label: "Change name",
+    about: "Off: comments carry the full name of your Mac user. On: a name you type." },
+  { key: "author.name", type: "text", default: null, label: "Comment author",
+    about: "The name your comments carry while Change name is on. 1 to 64 characters." },
 ];
 
 const CHECK = {
@@ -34,7 +38,21 @@ const CHECK = {
   // A list of herdr machine names: strings only, trimmed, empty ones and duplicates dropped.
   machines: (v) => Array.isArray(v) && v.every((x) => typeof x === "string")
     ? [...new Set(v.map((x) => x.trim()).filter(Boolean))] : undefined,
+  // A name: trimmed, 1 to 64 characters (code points); empty or longer is invalid, never cut.
+  text: (v) => {
+    if (typeof v !== "string") return undefined;
+    const s = v.trim(), n = Array.from(s).length;
+    return n >= 1 && n <= 64 ? s : undefined;
+  },
 };
+
+// Deletes a key, dotted or nested.
+function removeAt(cfg, key) {
+  if (key in cfg) { delete cfg[key]; return; }
+  const parts = key.split("."), last = parts.pop();
+  const node = parts.reduce((o, k) => (o && typeof o === "object" ? o[k] : undefined), cfg);
+  if (node && typeof node === "object") delete node[last];
+}
 
 const fresh = (v) => Array.isArray(v) ? [...v] : v; // a default list is never shared between loads
 const at = (cfg, key) => key in cfg ? cfg[key] : key.split(".").reduce((o, k) => o && typeof o === "object" ? o[k] : undefined, cfg);
@@ -72,7 +90,8 @@ export function isSingleAgent(settings, machine) {
 }
 
 // The file's new text with `edits` ({ key: value }) written in: a dotted key as a nested object, other keys kept as
-// they are. A broken file is never overwritten: it throws, and the dialog says so.
+// they are. null removes a setting whose default is none (the custom comment author). A broken file is never
+// overwritten: it throws, and the dialog says so.
 export function withSettings(text, edits) {
   let cfg = {};
   if (text != null && String(text).trim() !== "") {
@@ -81,6 +100,7 @@ export function withSettings(text, edits) {
   }
   for (const [key, value] of Object.entries(edits)) {
     const s = SETTINGS.find((x) => x.key === key);
+    if (s && value === null && s.default === null) { removeAt(cfg, key); continue; }
     if (!s || CHECK[s.type](value, s) === undefined) throw new Error(`not a setting: ${key}`);
     if (key in cfg) { cfg[key] = value; continue; } // a dotted key the person wrote stays dotted
     const parts = key.split("."), last = parts.pop();

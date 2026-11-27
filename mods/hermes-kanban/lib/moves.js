@@ -28,9 +28,10 @@ const message = (e) => String(e?.message ?? e);
 
 // "Comment & unblock": two requests without atomicity, both through act() and so to the task's own machine. The
 // comment goes first; a refused PATCH (409: blocked by parents not done) leaves it standing, and `error` says why.
-export async function commentAndUnblock(api, task, text) {
+// `author`: who the comment comes from (lib/author.js authorOf).
+export async function commentAndUnblock(api, task, text, author) {
   try {
-    const c = await api.act(task, "comment", { body: text });
+    const c = await api.act(task, "comment", { body: text, author });
     if (!ok(c)) return { commented: false, moved: null, error: failureOf(c) };
   } catch (e) {
     return { commented: false, moved: null, error: message(e) };

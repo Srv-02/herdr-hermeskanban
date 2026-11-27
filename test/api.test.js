@@ -146,11 +146,21 @@ test("rejects unsafe task ids", () => {
   assert.equal(calls.length, 0);
 });
 
-test("comment sends author herdr and the text unchanged", async () => {
+test("comment sends the passed author and the text unchanged", async () => {
   const { api, calls } = fake();
   const text = "it's \"done\" $(rm -rf ~) `id`\nline two 🎉 & ?board=x";
-  await api.comment("devbox", "t_a1b2", text);
-  assert.deepEqual(body(calls[0]), { body: text, author: "herdr" });
+  await api.comment("devbox", "t_a1b2", text, "Jane Doe");
+  assert.deepEqual(body(calls[0]), { body: text, author: "Jane Doe" });
+});
+
+test("comment: the author is trimmed and cut to 64 characters, and herdr without one", async () => {
+  const { api, calls } = fake();
+  await api.comment("devbox", "t_a1b2", "a", "  Jane Doe  ");
+  await api.comment("devbox", "t_a1b2", "b", "q".repeat(80));
+  await api.comment("devbox", "t_a1b2", "c", "  ");
+  await api.comment("devbox", "t_a1b2", "d");
+  await api.act({ machine: "devbox", id: "t_a1b2" }, "comment", { body: "e", author: "ACME Ops" });
+  assert.deepEqual(calls.map((c) => body(c).author), ["Jane Doe", "q".repeat(64), "herdr", "herdr", "ACME Ops"]);
 });
 
 test("patch sends only status, assignee and priority and returns the normalized task", async () => {

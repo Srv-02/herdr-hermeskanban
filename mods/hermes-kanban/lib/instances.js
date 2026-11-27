@@ -62,14 +62,16 @@ export function rememberPane(lastPanes, focus, panes) {
   return { ...lastPanes, [focus.machine]: focus.pane };
 }
 
-// What a click on the tab bar button does. Another visible instance with an unseen needs-you event (the first by name;
-// as the strips: all but the one the panel shows): jump there. Else on a Hermes focus (a pane on a machine that runs
-// Hermes): toggle the panel. Else only a
-// shown panel closes; a hidden one stays hidden (the button is off).
+// What a click on the tab bar button does. Another visible instance with unseen news (all but the one the panel
+// shows): jump there, first one that needs you (red), else one with a finished task (green), each the first by name.
+// `otherwise` is what the click does when no pane is found there. Without such news, on a Hermes focus (a pane on a
+// machine that runs Hermes): toggle the panel. Else only a shown panel closes; a hidden one stays hidden (the button
+// is off).
 export function buttonAction({ focus, machines, unseen, on }) {
   const shown = focus?.hermes ? focus.machine : null;
-  const machine = (machines ?? []).find((m) => m !== shown && needsYou(unseen, m));
-  if (machine) return { kind: "jump", machine };
-  if (focus?.hermes) return { kind: "toggle" };
-  return { kind: on ? "close" : "off" };
+  const otherwise = focus?.hermes ? "toggle" : on ? "close" : "off";
+  const others = (machines ?? []).filter((m) => m !== shown);
+  const machine = others.find((m) => needsYou(unseen, m)) ?? others.find((m) => unseen?.[m]?.done > 0);
+  if (machine) return { kind: "jump", machine, otherwise };
+  return { kind: otherwise };
 }

@@ -73,9 +73,9 @@ Then focus a pane on a machine that runs Hermes and click `Hermes` in the tab ba
 - **Per machine:** a machine runs Hermes when the button's last poll found `~/.hermes/kanban.db` there (see [Syncing](#syncing)). Then every pane on it shows its board: a shell, a Hermes pane or a terminal block alike. So a machine that runs Hermes only as a gateway service, with nothing but a shell open in Herdr, shows its board too. Before the first poll knows a machine, a pane where Herdr sees the agent `hermes` running counts as well.
 - **No Hermes here:** a pane on a machine without `kanban.db`, and every pane on your Mac, shows `No Hermes on this machine`. The panel never falls back to the last board, and it never shows two boards mixed.
 - **Clicking into the panel** (the search, say) keeps the board: a mod has the keyboard then, not a pane.
-- **The `Hermes` button** opens and closes the panel on any pane of a machine that runs Hermes, and also while you work in the panel. On any other pane it is grey with the tooltip `No Hermes on this machine`, and a click does nothing, except that it still closes a panel that is open. While another instance needs you, a click jumps there instead (see [Notifications](#notifications)).
+- **The `Hermes` button** opens and closes the panel on any pane of a machine that runs Hermes, and also while you work in the panel. On any other pane it is grey with the tooltip `No Hermes on this machine`, and a click does nothing, except that it still closes a panel that is open. While another instance has a dot (something needs you or a task finished), a click jumps there instead (see [Notifications](#notifications)).
 - The panel follows a change of focus within 3 seconds at the latest.
-- **The header:** `Hermes`, the instance's name on the right, then `+` (new task), refresh, the funnel (priority and grouping) and the gear (settings). Without a Hermes only the gear stays.
+- **The header:** `Hermes`, the instance's name on the right, then `+` (new task), refresh, the funnel (priority, grouping and sorting) and the gear (settings). Without a Hermes only the gear stays.
 
 ### Instances
 
@@ -108,7 +108,7 @@ At the bottom: `3 running · 1 problem` on the left, followed by `synced 4m ago`
 
 - **Group `Status`** (the default): Triage, Todo, Scheduled, Ready, Running, Blocked, Review, Done, in the order and with the names of Hermes' workflow. Groups without tasks are left out. Blocked and Review carry the red alert: they need you.
 - **Group `Agent`:** one group per agent in alphabetical order, `no agent` last. **Group `None`:** one list.
-- **Order** in every group as Hermes' dispatcher picks: the highest priority first (Hermes starts a higher number first), the oldest first among equals.
+- **Order** in every group by the time the row shows: when a done task finished (when it was created, if Hermes has no finish time), when any other task was created. Newest first by default; the sort toggle at the end of the funnel's row turns it to oldest first. Tasks without a time go last, equal times by ID. Priority does not sort; it is a filter and the chip on the row.
 - **Colors** as Hermes' own board: Triage and Done in the theme's dim grey, Todo muted, Scheduled violet, Ready blue, Running green and turning, Blocked and Review red. With [`status.color`](#settings) `mono` everything is one quiet color except what needs you. All colors come from the theme, so light and dark themes work.
 
 ### Rows
@@ -124,7 +124,7 @@ At the bottom: `3 running · 1 problem` on the left, followed by `synced 4m ago`
 ### Filter
 
 - **Always shown, one row:** `Open | Done | All`; the agent menu (`All agents`, each agent with a check box, `no agent`; the button reads `All agents`, the agent's name, or `2 agents`); and the search over the rest of the width. The search looks at ID, title and agent; the `×` clears it.
-- **The funnel** in the header opens a second row below a divider: `Prio` `All | P1 | P2 | P3+` (Hermes' own numbers: `P3+` is 3 and higher) and `Group` `Status | Agent | None`. A grey dot on the funnel says that a value there differs from the default while the row is closed.
+- **The funnel** in the header opens a second row below a divider: `Prio` `All | P1 | P2 | P3+` (Hermes' own numbers: `P3+` is 3 and higher) and `Group` `Status | Agent | None`, and at its end the sort toggle (the up and down arrows; the tooltip says `Newest first` or `Oldest first`, a click turns it round). A grey dot on the funnel says that a priority or grouping there differs from the default while the row is closed; the sort order never sets it.
 - The filters and the open row are remembered; the search is not. An agent picked on one instance filters nothing on an instance that does not have it.
 
 ## Task overlay
@@ -134,7 +134,7 @@ A click on a row opens the task in a large dialog. Everything in it goes to the 
 - **The head:** title, ID, the instance, Close (Esc); the status pill, the agent, `created 2h ago` and the number of comments.
 - **Left:** for a blocked task a red box with the reason (`writer is blocked`, `needs input: …`); the description; the activity (events and comments, newest first, heartbeats left out); and the comment box.
 - **Text from Hermes** (titles, descriptions, comments, reasons) is drawn as plain text, never as Markdown or HTML: anyone who can reach an instance can write a task. Line breaks stay; a bare `https` URL becomes a link that opens in your browser on a click. No picture or other resource is ever loaded.
-- **Comment** (or Ctrl+Enter) adds the comment as `herdr`. **Comment & unblock**, for a blocked task, adds the comment and then asks Hermes to move the task to Ready. These are two requests: when Hermes refuses the move (a parent task is not done, say), the comment stays and the line at the bottom says so.
+- **Comment** (or Ctrl+Enter) adds the comment under your name: the full name of your Mac user, or the name set under [Comment author](#settings) in the settings (`herdr` only when neither is there). **Comment & unblock**, for a blocked task, adds the comment and then asks Hermes to move the task to Ready. These are two requests: when Hermes refuses the move (a parent task is not done, say), the comment stays and the line at the bottom says so.
 - **Right column:**
   - **Agent (assignee):** the board's agents, each with `idle` or `1 running`, and `Unassigned`.
   - **Move to:** only the moves Hermes' workflow allows from the current status, read from Hermes, so they survive Hermes updates.
@@ -160,7 +160,7 @@ The `+` in the header opens `New task` on the instance the panel shows; the dial
   - A click on a toast jumps to that instance: the pane you focused there last (a shell pane as well, if it is still open), else the first pane that runs Hermes, else the first terminal pane, else any pane of a space on that machine; the panel follows by itself.
 - **The dot** on the `Hermes` button, over all visible instances: red and glowing for something new that needs you (needs you or failed), green for a task newly done, nothing else. It shows only what you have not seen: opening the panel on an instance clears its part at once, and so does a click on the button that jumps there; and the instance the panel shows collects nothing. A task that just stays blocked, or an agent that runs, adds nothing. No count.
 - **Other instances:** in the panel, a red strip `labbox needs you` with `Go to pane →` for each other visible instance with unseen news that needs you.
-- **The button jumps:** while another visible instance has unseen news that needs you (a red strip would show for it), the tooltip says `Go to labbox` and a click on `Hermes` goes to that instance, as a toast does, and opens the panel there. With several, the first by name. This holds on any pane, on a machine with or without Hermes. A green dot changes nothing about the click.
+- **The button jumps:** while another visible instance has unseen news, red or green, the tooltip says `Go to labbox` and a click on `Hermes` goes to that instance, as a toast does, and opens the panel there. An instance that needs you comes first, then one with a finished task; among equals the first by name. The jump clears that instance's whole dot; a green dot on a third instance stays, and the next click jumps there. This holds on any pane, on a machine with or without Hermes, so while another instance has a green dot, a click jumps instead of closing the panel. When no pane of that instance can be found, the click clears its dot and then opens or closes the panel as usual. The instance the panel shows never counts. The red strips in the panel stay for needs you only.
 - **Sounds:** Herdr's `blocked` sound for needs you and failed, its `done` sound for done; at most one per poll. **Dock badge:** a dot on the Herdr icon while something that needs you is unseen; no number.
 - Each has its own switch in the [settings](#settings).
 
@@ -219,7 +219,7 @@ The panel takes these commands, for `keys.json` (`"alt-h r": "hermes-kanban.refr
 | Command | What it does |
 |---|---|
 | `hermes-kanban.refresh` | Polls the shown instance now |
-| `hermes-kanban.filter` | Shows or hides the second filter row (priority and grouping) |
+| `hermes-kanban.filter` | Shows or hides the second filter row (priority, grouping and sorting) |
 | `hermes-kanban.settings` | Opens the Settings dialog |
 | `hermes-kanban.new` | Opens `New task` on the shown instance |
 | `hermes-kanban.open` | Opens the first task of the list in its overlay |
@@ -239,6 +239,8 @@ The gear at the right of the header opens the Settings dialog; **Save** writes t
 | `badge` | Dock badge | true / false | `false` | A dot (`•`) on the Herdr icon in the Dock while something that needs you is unseen. No number. |
 | `poll_seconds` | Check every | `15` / `30` / `60` / `120` | `30` | Seconds between two cheap checks of each visible instance. The board is read only when it changed. |
 | `update_check` | Check for updates automatically | true / false | `true` | Once a day, asks GitHub whether a new version exists. Nothing about you or your boards is sent, but GitHub sees your IP address. |
+| `author.custom` | Change name | true / false | `false` | Off: your comments carry the full name of your Mac user (`id -F`, else your login, else `herdr`). On: the name in `author.name`. |
+| `author.name` | Comment author | text, 1 to 64 characters | none | The name your comments carry while `author.custom` is on. Trimmed; an empty or longer name counts as none. |
 
 ```json
 {
@@ -250,6 +252,8 @@ The gear at the right of the header opens the Settings dialog; **Save** writes t
 ```
 
 A dotted key (`"toast.done": false`) works too. All settings are defined in one place, `mods/hermes-kanban/lib/settings.js`.
+
+**Comment author** in the dialog, between Agents and Display: the switch **Change name**, and below it the current author. Off, it shows your Mac user's full name, read only. Switching it on turns that into a field, prefilled with that name; an empty field is never saved and shows the last name again when you leave it. Switching it off goes back to the Mac name and clears the stored one.
 
 The dialog also shows, without a key of its own: **Default agent** of the shown instance, **Hermes instances** (every visible machine with a board) and **Remove access** (see [Remove access](#remove-access)).
 
@@ -272,8 +276,8 @@ The dialog also shows, without a key of its own: **Default agent** of the shown 
 - **API calls:** `curl` to `http://127.0.0.1:9120` and nowhere else.
   - `GET /api/status` (public, without key): version, gateway state, sign-in on or off.
   - Under `/api/plugins/kanban`, always with `?board=default`: `GET /board`, `/workflow`, `/orchestration`, `/diagnostics?severity=warning`, `/tasks/<id>`, and `/stats` to check access.
-  - **Writes, only on your click:** `PATCH /tasks/<id>` (status, also `archived`; agent; priority), `POST /tasks/<id>/comments` (author `herdr`), `POST /tasks`. Never `DELETE`. Task IDs are checked (`[A-Za-z0-9_-]`) before they reach a URL.
-- **The key never leaves the machine.** The remote shell builds the header itself, `{ printf 'Authorization: Bearer '; cat "$key"; } | curl … -H @-`: `printf` is a shell builtin and `cat` reads the file, so the key is in no command line (`ps`), never comes back to your Mac, and is in no output or log. Output from the machine that the panel shows (errors, the restart's log) is masked for anything that looks like a key. The request body (a comment, a title) is an argument of `curl` and so visible in the machine's process list for the moment of the call; the board is on that machine anyway.
+  - **Writes, only on your click:** `PATCH /tasks/<id>` (status, also `archived`; agent; priority), `POST /tasks/<id>/comments` (author: your name, see [Comment author](#settings)), `POST /tasks`. Never `DELETE`. Task IDs are checked (`[A-Za-z0-9_-]`) before they reach a URL.
+- **The key never leaves the machine.** The remote shell builds the header itself, `{ printf 'Authorization: Bearer '; cat "$key"; } | curl … -H @-`: `printf` is a shell builtin and `cat` reads the file, so the key is in no command line (`ps`), never comes back to your Mac, and is in no output or log. Output from the machine that the panel shows (errors, the restart's log) is masked for anything that looks like a key. The request body (a comment, a title) is an argument of `curl` and so visible in the machine's process list for the moment of the call; the board is on that machine anyway. The same holds for your name as a comment's author: it goes to each Hermes machine you comment on in the request body, and is visible there in `ps` for the moment of the call.
 - **The probe**, only when the board answers 401 or the gateway is down, when the settings open for an instance with sign-in, and right before a setup: `systemctl --user list-unit-files 'hermes-gateway*.service'` and `systemctl --user show -p MainPID`, `curl --version`, `command -v python3`, whether `~/.hermes`, the key and the drop-in exist, and whether the gateway's `/proc/<pid>/environ` holds the name `HERMES_DASHBOARD_SESSION_TOKEN` (`grep -q`: yes or no, never the value).
 - **Set up access**, on **Confirm**: `python3` makes the key only if `~/.hermes/dashboard.token` is missing (mode 0600); the drop-in `~/.config/systemd/user/<gateway unit>.d/herdr-kanban-token.conf` is written through a temporary file (mode 0600); then `systemctl --user daemon-reload`.
 - **Restart gateway**, on your click only: `hermes gateway restart`. It is the only `hermes` command the mod ever runs. Then `GET /api/status` every 2 seconds for up to about 100 seconds, and `GET /stats` with the key.
@@ -284,8 +288,8 @@ The dialog also shows, without a key of its own: **Default agent** of the shown 
 
 - **Files:** `hermes-kanban.json` in the Herdr app folder, written only by the Settings dialog. The filters and whether the second filter row is open are kept in the mod's own storage. The mod writes no cache file of its own, but Herdr keeps every shared value below in `shared.json` in the Herdr app folder, the last boards (`hermes-kanban.boards`) included.
 - **Network:** the daily update check (see [Updates](#updates)). Nothing else: every Hermes call runs on its machine.
-- **Programs:** `open` for an `https` link you click in a task.
-- **Shared values:** `workspace.panels` (adds `hermes-kanban` so the tab bar restores the panel), `hermes-kanban.boards` (the boards), `hermes-kanban.unseen` and `hermes-kanban.seen` (the dot), `hermes-kanban.shown` (which instance each panel shows), `hermes-kanban.lastPanes` (where a jump lands), `hermes-kanban.refresh` (poll a machine now), `hermes-kanban.restarting` (one gateway restart per machine at a time), `hermes-kanban.pick` (the agent menu), `hermes-kanban.config` (the dialog saved), `hermes-kanban.update` and `hermes-kanban.lease` (the update check and the polling copy).
+- **Programs:** `open` for an `https` link you click in a task; `id -F` (else `id -un`) once per start of the polling copy, for the name your comments carry.
+- **Shared values:** `workspace.panels` (adds `hermes-kanban` so the tab bar restores the panel), `hermes-kanban.boards` (the boards), `hermes-kanban.unseen` and `hermes-kanban.seen` (the dot), `hermes-kanban.shown` (which instance each panel shows), `hermes-kanban.lastPanes` (where a jump lands), `hermes-kanban.refresh` (poll a machine now), `hermes-kanban.restarting` (one gateway restart per machine at a time), `hermes-kanban.pick` (the agent menu), `hermes-kanban.config` (the dialog saved), `hermes-kanban.osName` (your Mac user's name, the comments' default author), `hermes-kanban.update` and `hermes-kanban.lease` (the update check and the polling copy).
 
 ## Removing
 

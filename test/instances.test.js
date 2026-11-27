@@ -165,8 +165,8 @@ const shellOnDevbox = { machine: "devbox", pane: null, hermes: false };
 
 test("buttonAction: another instance that needs you is a jump, the first by name, Hermes or not", () => {
   const unseen = { nobox: { needs: 1, done: 0 }, labbox: { needs: 2, done: 0 } };
-  assert.deepEqual(buttonAction({ focus: onDevbox, machines, unseen, on: true }), { kind: "jump", machine: "labbox" });
-  assert.deepEqual(buttonAction({ focus: { machine: null, pane: null, hermes: false }, machines, unseen, on: false }), { kind: "jump", machine: "labbox" });
+  assert.deepEqual(buttonAction({ focus: onDevbox, machines, unseen, on: true }), { kind: "jump", machine: "labbox", otherwise: "toggle" });
+  assert.deepEqual(buttonAction({ focus: { machine: null, pane: null, hermes: false }, machines, unseen, on: false }), { kind: "jump", machine: "labbox", otherwise: "off" });
 });
 
 test("buttonAction: the shown instance needing you is no jump, a shell pane there is", () => {
@@ -174,17 +174,33 @@ test("buttonAction: the shown instance needing you is no jump, a shell pane ther
   assert.deepEqual(buttonAction({ focus: onDevbox, machines, unseen, on: false }), { kind: "toggle" });
   // A focus on devbox without Hermes (no snapshot says so yet): the panel shows no board, so devbox's strip shows and
   // the button jumps there too.
-  assert.deepEqual(buttonAction({ focus: shellOnDevbox, machines, unseen, on: false }), { kind: "jump", machine: "devbox" });
+  assert.deepEqual(buttonAction({ focus: shellOnDevbox, machines, unseen, on: false }), { kind: "jump", machine: "devbox", otherwise: "off" });
 });
 
 test("buttonAction: a needs-you event of an instance that is not visible is no jump", () => {
   assert.deepEqual(buttonAction({ focus: onDevbox, machines: ["devbox"], unseen: { labbox: { needs: 1, done: 0 } }, on: false }), { kind: "toggle" });
 });
 
-test("buttonAction: green (done) changes nothing", () => {
+test("buttonAction: green (done) on another instance jumps too", () => {
   const unseen = { labbox: { needs: 0, done: 3 } };
-  assert.deepEqual(buttonAction({ focus: onDevbox, machines, unseen, on: true }), { kind: "toggle" });
-  assert.deepEqual(buttonAction({ focus: shellOnDevbox, machines, unseen, on: false }), { kind: "off" });
+  assert.deepEqual(buttonAction({ focus: onDevbox, machines, unseen, on: true }), { kind: "jump", machine: "labbox", otherwise: "toggle" });
+  assert.deepEqual(buttonAction({ focus: shellOnDevbox, machines, unseen, on: true }), { kind: "jump", machine: "labbox", otherwise: "close" });
+});
+
+test("buttonAction: red wins over green, whatever the names", () => {
+  const unseen = { devbox: { needs: 0, done: 2 }, nobox: { needs: 1, done: 0 } };
+  assert.deepEqual(buttonAction({ focus: { machine: null, pane: null, hermes: false }, machines, unseen, on: false }), { kind: "jump", machine: "nobox", otherwise: "off" });
+  // With only green ones, the first by name.
+  const green = { nobox: { needs: 0, done: 1 }, labbox: { needs: 0, done: 4 } };
+  assert.deepEqual(buttonAction({ focus: onDevbox, machines, unseen: green, on: false }), { kind: "jump", machine: "labbox", otherwise: "toggle" });
+});
+
+test("buttonAction: the shown instance's own dot, red or green, is no jump", () => {
+  for (const u of [{ needs: 1, done: 0 }, { needs: 0, done: 1 }, { needs: 2, done: 5 }]) {
+    assert.deepEqual(buttonAction({ focus: onDevbox, machines, unseen: { devbox: u }, on: true }), { kind: "toggle" });
+  }
+  // A green dot on an instance that is not visible is no jump either.
+  assert.deepEqual(buttonAction({ focus: onDevbox, machines: ["devbox"], unseen: { labbox: { needs: 0, done: 1 } }, on: false }), { kind: "toggle" });
 });
 
 test("buttonAction: without Hermes the button is off, but a shown panel still closes", () => {
