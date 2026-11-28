@@ -147,10 +147,10 @@ test("activityOf: events and comments, newest first, with the reason of a block"
       { kind: "blocked", at: 400, payload: { reason: "needs input: which range?" } },
       { kind: "crashed", at: 300, payload: { error: "no binary" } },
     ],
-    comments: [{ author: "herdr", body: "Only v2.4", at: 500 }],
+    comments: [{ id: 9, author: "herdr", body: "Only v2.4", at: 500 }],
   };
   assert.deepEqual(activityOf(detail), [
-    { at: 500, text: "herdr commented: Only v2.4", tone: "blue" },
+    { at: 500, text: "herdr commented", body: "Only v2.4", key: "comment-9", tone: "blue" },
     { at: 400, text: "Blocked: needs input: which range?", tone: "red" },
     { at: 300, text: "Crashed: no binary", tone: "red" },
     { at: 200, text: "Claimed", tone: "yellow" },
@@ -172,7 +172,7 @@ test("activityOf: heartbeats left out, commented events only without listed comm
     { kind: "completed", at: 193, payload: { summary: "notes written" } },
   ];
   const withComments = activityOf({ events, comments: [{ author: "herdr", body: "hi", at: 160 }] });
-  assert.deepEqual(withComments.map((a) => a.text), ["Completed: notes written", "Reclaimed", "Gave up", "Timed out", "Spawned", "Status: todo", "herdr commented: hi"]);
+  assert.deepEqual(withComments.map((a) => a.text), ["Completed: notes written", "Reclaimed", "Gave up", "Timed out", "Spawned", "Status: todo", "herdr commented"]);
   assert.deepEqual(withComments.map((a) => a.tone), [null, "red", "red", "red", "yellow", null, "blue"]);
   const without = activityOf({ events, comments: [] });
   assert.ok(without.some((a) => a.text === "Commented"), "a commented event shows when no comment is listed");
@@ -211,7 +211,7 @@ test("hintOf in single agent mode names no agent", () => {
 test("activityOf in single agent mode names the instance for an agent's comment", () => {
   const detail = { events: [], comments: [{ at: 2, author: "default", body: "done it" }, { at: 1, author: "herdr", body: "go" }] };
   const texts = activityOf(detail, { agents: ["default"], instance: "devbox" }).map((x) => x.text);
-  assert.deepEqual(texts, ["devbox commented: done it", "herdr commented: go"]);
+  assert.deepEqual(texts, ["devbox commented", "herdr commented"]);
 });
 
 // The agent filter picks several: a task matches when its agent (or "none" for no agent) is picked; none picked = all.
@@ -250,4 +250,9 @@ test("filterTasks: in single agent mode the query does not match the agent", () 
   const f = (single) => filterTasks(tasks, { state: "all", query: "analyst", agents: [], prio: "all", single }).map((x) => x.id);
   assert.deepEqual(f(false), ["t_4"]);
   assert.deepEqual(f(true), []);
+});
+
+test("activityOf: a comment without id still gets a key of its own", () => {
+  const items = activityOf({ events: [], comments: [{ author: "a", body: "x", at: 2 }, { author: "b", body: "y", at: 1 }] });
+  assert.deepEqual(items.map((a) => [a.key, a.body]), [["comment-i0", "x"], ["comment-i1", "y"]]);
 });

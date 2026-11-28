@@ -249,18 +249,18 @@ test("single agent mode hides the agent choice in both overlays", () => {
   for (const f of ["viewer.js", "create.js"]) assert.match(code(f), /isSingleAgent\(this\.settings, this\.machine\)/, f);
 });
 
-// Untrusted task text: the description is Markdown as in Hermes' web app, but raw HTML stays text, no image is
-// loaded (safeMarkdown) and a link opens only through safeLink. Nothing else renders Markdown or HTML.
-test("the overlay draws the description as safe Markdown", () => {
+// Untrusted task text: the description and the comments are Markdown as in Hermes' web app, all through one helper:
+// raw HTML stays text, no image is loaded (safeMarkdown) and a link opens only through safeLink.
+test("the overlay draws description and comments as safe Markdown", () => {
   const all = fs.readdirSync(dir, { recursive: true }).filter((f) => f.endsWith(".js")).map((f) => source(f)).join("\n");
-  const src = source("viewer.js");
-  assert.match(src, /TextView\.markdown\(`body-\$\{this\.id\}`, this\.bodyMarkdown\(body\)\)\.raw_html\(false\)\.selectable\(true\)\.on_link_click\(\(url\) => openUrl\(safeLink\(url\)\)\)/);
-  // Memoized: safeMarkdown runs once per body, not on every render.
-  assert.match(src, /if \(this\.md\?\.body !== body\) this\.md = \{ body, md: safeMarkdown\(body\) \};/);
-  assert.equal([...code("viewer.js").matchAll(/safeMarkdown\(/g)].length, 1, "safeMarkdown is called in one place");
+  const src = source("viewer.js"), viewer = code("viewer.js");
+  assert.match(src, /if \(m\?\.text !== text\) this\.md\.set\(id, m = \{ text, md: safeMarkdown\(text\) \}\);/, "memoized per text");
+  assert.match(src, /return TextView\.markdown\(id, m\.md\)\.raw_html\(false\)\.selectable\(true\)\.on_link_click\(\(url\) => openUrl\(safeLink\(url\)\)\);/);
+  assert.equal([...viewer.matchAll(/safeMarkdown\(/g)].length, 1, "safeMarkdown is called in one place");
   assert.equal([...all.matchAll(/TextView\.markdown\(/g)].length, 1, "one Markdown view, fed by safeMarkdown");
   assert.doesNotMatch(all, /TextView\.html\(/, "no HTML view of Hermes content");
-  assert.equal([...code("viewer.js").matchAll(/\.raw_html\(false\)/g)].length, 1);
+  assert.match(src, /this\.markdown\(`body-\$\{this\.id\}`, body\)/, "the description");
+  assert.match(src, /this\.markdown\(a\.key, a\.body\)/, "each comment");
   assert.match(source("ui.js"), /export function openUrl\(url\) \{\s*if \(!safeLink\(url\)\) return;/);
 });
 

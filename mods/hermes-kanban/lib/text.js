@@ -1,7 +1,7 @@
 // Text from Hermes for the overlay. It comes from anyone who can reach an instance. The description renders as
 // Markdown, as Hermes' own web app does, with three guards: raw HTML stays literal text (TextView .raw_html(false)),
 // no picture is ever loaded (safeMarkdown breaks every image opener), and a click opens a link only when
-// safeLink passes it (ui.js openUrl). Titles, comments and reasons stay plain text.
+// safeLink passes it (ui.js openUrl). Comments render the same way; titles and reasons stay plain text.
 
 export const safeLink = (url) => (typeof url === "string" && /^https:\/\/\S+$/i.test(url) ? url : null);
 

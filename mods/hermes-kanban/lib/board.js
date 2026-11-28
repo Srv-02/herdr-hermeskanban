@@ -68,7 +68,7 @@ export function normalizeWorkflow(json) {
 // GET /tasks/{id}: the task with its full body, comments, events and runs.
 export function normalizeDetail(json, machine) {
   const list = (v) => (Array.isArray(v) ? v.filter(isObj) : []);
-  const comments = list(json?.comments).map((c) => ({ author: str(c.author) ?? "", body: str(c.body) ?? "", at: num(c.created_at) }));
+  const comments = list(json?.comments).map((c) => ({ id: num(c.id), author: str(c.author) ?? "", body: str(c.body) ?? "", at: num(c.created_at) }));
   const task = normalizeTask(json?.task, machine);
   return {
     task: task && { ...task, comments: comments.length, body: str(json.task.body) },
