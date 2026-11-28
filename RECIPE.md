@@ -47,7 +47,7 @@ Instead of the list, blankslates (icon 22px, title semibold, lines text 12 `t.mu
 
 ## Built from
 
-Folder `mods/hermes-kanban/`, `mod.json` `{ "place": "none", "version": "1.2.0" }`.
+Folder `mods/hermes-kanban/`, `mod.json` `{ "place": "none", "version": "1.2.1" }`.
 
 - **One `View`, roles by props**: none: the panel; `{ button: true }`: the pill and the watcher (adds `hermes-kanban` to shared `workspace.panels`); `{ task }`, `{ create }`, `{ settings: true, machine }`, `{ menu }`: the overlays.
 - **Layout blocks**: in a row `tab-bar` (42px) `{ "id": "hermes-kanban-button", "type": "block", "content": { "mod": "hermes-kanban", "props": { "button": true } }, "size": { "px": 92 }, "window_drag": true }`; in `panel` > `panel-body` `{ "id": "hermes-kanban", "type": "block", "content": { "mod": "hermes-kanban" }, "size": { "weight": 1 }, "min": 120 }`. The pill finds the panel by its mod.
