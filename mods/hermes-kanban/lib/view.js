@@ -98,7 +98,8 @@ export function activityOf(detail, { agents = null, instance = null } = {}) {
     return { at: e.at, text: why ? `${sentence(e.kind)}: ${why}` : sentence(e.kind), tone: RED_EVENTS.has(e.kind) ? "red" : YELLOW_EVENTS.has(e.kind) ? "yellow" : null };
   });
   const who = (a) => (agents && instance && agents.includes(a) ? instance : a || "someone");
-  const said = comments.map((c) => ({ at: c.at, text: `${who(c.author)} commented: ${c.body}`, tone: "blue" }));
+  // A comment's body comes apart from its line: the overlay renders it as Markdown, as Hermes' web app does.
+  const said = comments.map((c, i) => ({ at: c.at, text: `${who(c.author)} commented`, body: c.body, key: `comment-${c.id ?? `i${i}`}`, tone: "blue" }));
   return [...events, ...said].sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
 }
 

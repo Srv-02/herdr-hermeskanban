@@ -211,19 +211,21 @@ export class TaskViewer {
         .child(`Answer as a comment, then unblock.${task.assignee ? " The agent continues with the next dispatch." : ""}`));
   }
 
-  // The body is untrusted (anyone who reaches the instance can write a task). It renders as Markdown, as in Hermes'
-  // web app: raw HTML as literal text, no image loaded (lib/text.js safeMarkdown), a click opens only an https link.
-  // safeMarkdown once per body, not on every render.
-  bodyMarkdown(body) {
-    if (this.md?.body !== body) this.md = { body, md: safeMarkdown(body) };
-    return this.md.md;
+  // Hermes' text is untrusted (anyone who reaches the instance can write a task). The description and each comment
+  // render as Markdown, as in Hermes' web app, all through here: raw HTML as literal text, no image loaded
+  // (lib/text.js safeMarkdown), a click opens only an https link. safeMarkdown once per text, not on every render.
+  markdown(id, text) {
+    this.md ??= new Map();
+    let m = this.md.get(id);
+    if (m?.text !== text) this.md.set(id, m = { text, md: safeMarkdown(text) });
+    return TextView.markdown(id, m.md).raw_html(false).selectable(true).on_link_click((url) => openUrl(safeLink(url)));
   }
   description(task, t) {
     const body = task?.body?.trim();
     return v_flex().flex_none().rounded(9).border_1().border_color(t.border).overflow_hidden()
       .child(h_flex().h(36).px(12).items_center().bg(t.raised).text_size(12).text_color(t.muted).child("Description"))
       .child(div().px(14).py(12).child(!this.detail ? div().text_color(t.muted).child("Loading…")
-        : body ? TextView.markdown(`body-${this.id}`, this.bodyMarkdown(body)).raw_html(false).selectable(true).on_link_click((url) => openUrl(safeLink(url))) : div().italic().text_color(t.muted).child("No description.")));
+        : body ? this.markdown(`body-${this.id}`, body) : div().italic().text_color(t.muted).child("No description.")));
   }
 
   activity(t, c) {
@@ -238,6 +240,8 @@ export class TaskViewer {
       .child(div().size(8).mt(5).flex_none().rounded(4).bg(a.tone ? c[a.tone] : t.muted))
       .child(v_flex().flex_1().min_w(0).gap(2)
         .child(div().child(a.text))
+        // A comment's body as Markdown, as in Hermes' web app (safeMarkdown: no image is loaded).
+        .when(a.body != null, (e) => e.child(this.markdown(a.key, a.body)))
         .child(div().text_size(11).text_color(t.muted).child(since(a.at))))));
   }
 

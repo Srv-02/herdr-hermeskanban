@@ -104,7 +104,7 @@ test("normalizeDetail maps task, comments, events and runs", () => {
   assert.equal(d.task.id, "t_a1b2");
   assert.equal(d.task.body, "Collect the changes since the last tag and write short notes.");
   assert.equal(d.task.comments, 1);
-  assert.deepEqual(d.comments, [{ author: "writer", body: "Which version range should the notes cover?", at: 1794997000 }]);
+  assert.deepEqual(d.comments, [{ id: 5, author: "writer", body: "Which version range should the notes cover?", at: 1794997000 }]);
   assert.deepEqual(d.events[2], { kind: "blocked", at: 1794997000, payload: { reason: "needs input: which version range?" } });
   assert.deepEqual(d.runs, [{ id: 7, status: "blocked", outcome: "blocked", startedAt: 1794994600, endedAt: 1794997000 }]);
   const bare = normalizeDetail({ task: { ...fixture("task").task, body: null } }, "labbox");
