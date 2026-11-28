@@ -10,7 +10,7 @@ import { div } from "gpui-kit";
 import { v_flex, h_flex, TextView, TextareaState, Textarea } from "gpui-base";
 import { theme, closeOverlay, shared, setShared, exec, notify, checking, readTextFile, appHome } from "herdr";
 import { tones, alpha, glyph, glyphOf, segmented, button, pill, look, openUrl } from "./ui.js";
-import { plainHtml, safeLink, shownId } from "./lib/text.js";
+import { safeMarkdown, safeLink, shownId } from "./lib/text.js";
 import { createApi } from "./lib/api.js";
 import { normalizeDetail } from "./lib/board.js";
 import { allowedMoves, outcomeText, commentAndUnblock, mergePatched, failureOf } from "./lib/moves.js";
@@ -211,19 +211,19 @@ export class TaskViewer {
         .child(`Answer as a comment, then unblock.${task.assignee ? " The agent continues with the next dispatch." : ""}`));
   }
 
-  // The body is untrusted (anyone who reaches the instance can write a task): drawn as plain text, never as Markdown.
-  // plainHtml escapes every character and links only bare https URLs; a click opens only an https link.
-  // plainHtml once per body, not on every render.
-  bodyHtml(body) {
-    if (this.html?.body !== body) this.html = { body, html: plainHtml(body) };
-    return this.html.html;
+  // The body is untrusted (anyone who reaches the instance can write a task). It renders as Markdown, as in Hermes'
+  // web app: raw HTML as literal text, no image loaded (lib/text.js safeMarkdown), a click opens only an https link.
+  // safeMarkdown once per body, not on every render.
+  bodyMarkdown(body) {
+    if (this.md?.body !== body) this.md = { body, md: safeMarkdown(body) };
+    return this.md.md;
   }
   description(task, t) {
     const body = task?.body?.trim();
     return v_flex().flex_none().rounded(9).border_1().border_color(t.border).overflow_hidden()
       .child(h_flex().h(36).px(12).items_center().bg(t.raised).text_size(12).text_color(t.muted).child("Description"))
       .child(div().px(14).py(12).child(!this.detail ? div().text_color(t.muted).child("Loading…")
-        : body ? TextView.html(`body-${this.id}`, this.bodyHtml(body)).selectable(true).on_link_click((url) => openUrl(safeLink(url))) : div().italic().text_color(t.muted).child("No description.")));
+        : body ? TextView.markdown(`body-${this.id}`, this.bodyMarkdown(body)).raw_html(false).selectable(true).on_link_click((url) => openUrl(safeLink(url))) : div().italic().text_color(t.muted).child("No description.")));
   }
 
   activity(t, c) {

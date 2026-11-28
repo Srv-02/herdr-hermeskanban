@@ -1,12 +1,9 @@
-// Task text comes from anyone who can reach an instance. The overlay draws it as plain text: every character escaped,
-// line breaks kept, and only bare https URLs as links (opened on a click, https only). No Markdown, no raw HTML.
+// Task text comes from anyone who can reach an instance. The description renders as Markdown with raw HTML as text
+// (TextView .raw_html(false)) and no image: safeMarkdown breaks every image opener, so no picture is ever fetched.
+// A click opens a link only through safeLink (https only).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { plainHtml, linkify, safeLink, shownId } from "../mods/hermes-kanban/lib/text.js";
-
-// The only markup plainHtml may produce: line breaks and https links it made itself.
-const tags = (html) => [...html.matchAll(/<[^>]*>/g)].map((m) => m[0]);
-const onlyOurTags = (html) => tags(html).every((x) => x === "<br>" || x === "</a>" || /^<a href="https:\/\/[^"<>\s]+">$/.test(x));
+import { safeMarkdown, safeLink, shownId } from "../mods/hermes-kanban/lib/text.js";
 
 const HOSTILE = [
   "![x](http://example.com/t.png)",
@@ -21,63 +18,32 @@ const HOSTILE = [
   "<a href=\"javascript:alert(1)\">x</a> &lt;img&gt; &amp;",
 ];
 
-test("plainHtml: hostile Markdown and HTML stay literal text, no image, no non-https link", () => {
-  for (const input of HOSTILE) {
-    const html = plainHtml(input);
-    assert.ok(onlyOurTags(html), `${input} -> ${html}`);
-    assert.doesNotMatch(html, /<img|<script|<iframe|javascript:[^<]*">|href="http:/i, input);
+test("safeMarkdown: no image opener survives, also in code, escapes and references", () => {
+  for (const input of [...HOSTILE, "```\n![x](https://e.com/t.png)\n```", "`![x](u)`", "\\![x](u)", "!![x](u)", "![![x](u)](v)", "- ```\n![x](u)"]) {
+    assert.doesNotMatch(safeMarkdown(input), /!\[/, input);
   }
 });
 
-test("plainHtml: the text reads as written", () => {
-  assert.equal(plainHtml("![x](http://example.com/t.png)"), "![x](http://example.com/t.png)");
-  assert.equal(plainHtml("<img src=x> & \"q\" 'a'"), "&lt;img src=x&gt; &amp; &quot;q&quot; &#39;a&#39;");
-  assert.equal(plainHtml("[a](javascript:alert(1))"), "[a](javascript:alert(1))");
-  assert.equal(plainHtml("one\ntwo\r\n\nthree"), "one<br>two<br><br>three");
-  assert.equal(plainHtml("a\rb\r\rc"), "a<br>b<br><br>c", "a lone CR breaks the line too");
-  assert.equal(plainHtml("a  b\tc"), "a &nbsp;b &nbsp;c");
-  assert.equal(plainHtml(null), "");
+test("safeMarkdown: everything else reads as written", () => {
+  const md = "## Problem\n\n`nas-synology` on **host**\n\n- a\n- b\n\n1. one\n2. two\n\n[link](https://example.com) ! [x]";
+  assert.equal(safeMarkdown(md), md);
+  assert.equal(safeMarkdown("a ![x](https://e.com/t.png) b"), "a !\u200B[x](https://e.com/t.png) b");
+  assert.equal(safeMarkdown("one\r\ntwo"), "one\r\ntwo");
+  assert.equal(safeMarkdown(null), "");
 });
 
-test("plainHtml: bare https URLs become links, trailing punctuation stays text", () => {
-  assert.equal(plainHtml("see https://example.com/a?b=1&c=2."), "see <a href=\"https://example.com/a?b=1&amp;c=2\">https://example.com/a?b=1&amp;c=2</a>.");
-  assert.equal(plainHtml("(https://example.com/x)"), "(<a href=\"https://example.com/x\">https://example.com/x</a>)");
-  assert.equal(plainHtml("http://example.com stays text"), "http://example.com stays text");
-  assert.equal(plainHtml("\\`![x](https://e.com/t.png)\\`"), "\\`![x](<a href=\"https://e.com/t.png\">https://e.com/t.png</a>)\\`");
-  assert.equal(plainHtml("![x](https://e.com/t.png)"), "![x](<a href=\"https://e.com/t.png\">https://e.com/t.png</a>)");
-});
-
-test("linkify: text and https URLs in order", () => {
-  assert.deepEqual(linkify("a https://example.com/x, b"), [{ text: "a " }, { url: "https://example.com/x" }, { text: ", b" }]);
-  assert.deepEqual(linkify(""), []);
+// A hostile body must not freeze the overlay.
+test("safeMarkdown: a 200k-char input finishes in under 200 ms", () => {
+  for (const input of ["![".repeat(100000), "!".repeat(200000), "`".repeat(200000)]) {
+    const t0 = performance.now();
+    safeMarkdown(input);
+    assert.ok(performance.now() - t0 < 200, input.slice(0, 10));
+  }
 });
 
 test("safeLink: https only", () => {
   assert.equal(safeLink("https://example.com/a"), "https://example.com/a");
   for (const u of ["http://example.com", "javascript:alert(1)", "file:///etc/passwd", "data:text/html,x", " https://x", "", null]) assert.equal(safeLink(u), null, String(u));
-});
-
-// A hostile body must not freeze the overlay: linear time on long punctuation runs and long URLs.
-test("plainHtml: 200k-char hostile inputs finish in under 200 ms each", () => {
-  const n = 200000;
-  for (const input of [
-    `https://a${".".repeat(n)}b`,
-    `https://a${".".repeat(n)}`,
-    `https://${"a".repeat(n)}`,
-    "https://".repeat(n / 8),
-    `${"(".repeat(n / 2)}https://a${")".repeat(n / 2)}`,
-    " ".repeat(n),
-    "\r\n".repeat(n / 2),
-  ]) {
-    const t0 = performance.now();
-    plainHtml(input);
-    const ms = performance.now() - t0;
-    assert.ok(ms < 200, `${input.slice(0, 20)}… took ${ms.toFixed(1)} ms`);
-  }
-});
-
-test("linkify: a bare https:// is text, not a link", () => {
-  assert.deepEqual(linkify("https://."), [{ text: "https://" }, { text: "." }]);
 });
 
 test("shownId drops Hermes' t_ prefix only", () => {

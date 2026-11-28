@@ -133,7 +133,7 @@ A click on a row opens the task in a large dialog. Everything in it goes to the 
 
 - **The head:** title, ID (without Hermes' internal prefix `t_`; click it to copy it), the instance, Close (Esc); the status pill, the agent, `created 2h ago` and the number of comments.
 - **Left:** for a blocked task a red box with the reason (`writer is blocked`, `needs input: …`); the description; the activity (events and comments, newest first, heartbeats left out); and the comment box.
-- **Text from Hermes** (titles, descriptions, comments, reasons) is drawn as plain text, never as Markdown or HTML: anyone who can reach an instance can write a task. Line breaks stay; a bare `https` URL becomes a link that opens in your browser on a click. No picture or other resource is ever loaded.
+- **Text from Hermes:** the description renders as Markdown, as in Hermes' web app: headings, lists, code and links. Anyone who can reach an instance can write a task, so HTML in it shows as text, no picture is ever loaded (an image shows as `!` and a link), and only `https` links open, in your browser, on a click. Titles, comments and reasons stay plain text.
 - **Comment** (or Ctrl+Enter) adds the comment under your name: the full name of your Mac user, or the name set under [Comment author](#settings) in the settings (`herdr` only when neither is there). **Comment & unblock**, for a blocked task, adds the comment and then asks Hermes to move the task to Ready. These are two requests: when Hermes refuses the move (a parent task is not done, say), the comment stays and the line at the bottom says so.
 - **Right column:**
   - **Agent (assignee):** the board's agents, each with `idle` or `1 running`, and `Unassigned`.
